@@ -1,0 +1,33 @@
+TechE scripts v1.0.6-qa ServOS VM pull simulation | 10 November 2026
+
+Input runtime archive SHA-256:
+9518dab746357efe36423813eb9c8feb38a304f8316d682a27c4f175e75fe407
+
+Cloned running ServOS staging VM263 to disposable VM273, with the clone's
+network link disabled to prevent a duplicate static IP. VM263 was not
+modified. The VM273 guest agent copied the exact runtime archive into
+/tmp and checked all seven SHA-256 entries. A local Git fixture contained
+the published scriptsv1.0 folder. A guest-only Git URL rewrite redirected
+the unmodified /usr/bin/teche bootstrap to that local fixture. The old
+VM273 /usr/bin/teche was backed up under /tmp before replacement. Test
+outputs are under /tmp/teche-fixture/results/ on VM273.
+
+Observed on VM273: all seven runtime hashes passed; the bootstrap cloned
+the scriptsv1.0 path, installed executable helpers, and activated source
+commit 1d0ef6c740e12d690398604dc2d2e0baddf095fc. All four get/update
+forms passed. Five help forms (bare, help, --help, -help, -h) and five
+version forms (ver, version, v, -v, --version) passed. `teche build` listed
+txt-network and gui-offline; gui-network remained withheld with exit 78.
+Both imported WorkDesk helpers passed Bash syntax checks. The menu
+refused to run without a WorkDesk pack (exit 2); uninstall refused removal
+(exit 78). A changed byte in the fixture's bin/teche was rejected on
+update with exit 65 and the previous active revision remained selected.
+
+This was a real installed ServOS guest but a local Git fixture, not an
+HTTPS pull from the public release path. The WorkDesk menu's interactive
+positive path, private source retrieval, ISO build, and WorkDesk install
+were not exercised. VM273 has an existing WorkDesk catalog: get/install
+attempted to fetch missing jq through APT while its network was disabled,
+then failed on DNS. That result is a test-environment limit, not a passed
+pack test. Do not publish the public scripts package or release a new
+ServOS ISO solely on this simulation.

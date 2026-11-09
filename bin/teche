@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-# TechE system utility. Installed by ServOS at /usr/bin/teche.
+# Full TechE dispatcher loaded by the ServOS /usr/bin/teche bootstrap.
 set -Eeuo pipefail
-version='1.0.5-qa'
+version='1.0.6-qa'
 usage() {
   cat <<'EOF'
 Usage: teche help
+       teche --help | -help | -h
        teche get scriptsv1.0
        teche update scriptsv1.0
        teche get scripts | teche update scripts
@@ -16,6 +17,8 @@ Usage: teche help
        teche status wd1.0
        teche uninstall wd1.0
        teche --version | -v | version | ver | v
+
+TechE platform v1.0 | scripts 1.0.6-qa
 
 Actions: build, get, update, install, uninstall, status
 
@@ -47,7 +50,8 @@ Usage: teche build wd1.0iso {txt-network|gui-offline} [absolute-output.iso]
 No other build targets are registered in this script.
 EOF
 }
-[[ $# -eq 1 && ( $1 == --help || $1 == -h || $1 == help ) ]] && { usage; exit 0; }
+(( $# == 0 )) && { usage; exit 0; }
+[[ $# -eq 1 && ( $1 == --help || $1 == -help || $1 == -h || $1 == help ) ]] && { usage; exit 0; }
 if [[ $# -eq 1 && ( $1 == --version || $1 == -v || $1 == version || $1 == ver || $1 == v ) ]]; then
   printf 'TechE platform: v1.0\n'
   if [[ -r /etc/os-release ]]; then . /etc/os-release; fi

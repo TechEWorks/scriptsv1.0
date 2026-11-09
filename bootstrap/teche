@@ -24,12 +24,13 @@ trap cleanup EXIT
 
 usage() {
   cat <<'EOF'
-TechE v1.0 bootstrap
+TechE v1.0 bootstrap (scripts not yet installed)
+  teche help | --help | -help Show available bootstrap commands.
   teche get scriptsv1.0       Fetch, verify and activate public scripts.
   teche update scriptsv1.0    Refresh the same scripts.
   teche get scripts           Alias for get scriptsv1.0.
   teche update scripts        Alias for update scriptsv1.0.
-  teche ver                   Show installed scripts version.
+  teche ver | --version       Show installed scripts version.
 Run teche help after installation for all product commands.
 EOF
 }
@@ -37,7 +38,8 @@ verify_tree() {
   local dir=$1 line rel hash actual count=0
   local -A listed=()
   [[ -d $dir && ! -L $dir && -f $dir/VERSION &&
-     -f $dir/SHA256SUMS.txt && -f $dir/bin/teche &&
+     -f $dir/SHA256SUMS.txt && -x $dir/bin/teche &&
+     -x $dir/lib/wd1.0-menu.sh && -x $dir/lib/wd1.0-uninstall.sh &&
      -f $dir/bootstrap/teche ]] || return 65
   [[ $(cat "$dir/VERSION") =~ ^1\.0\.[0-9]+(-qa)?$ ]] || return 65
   while IFS= read -r line || [[ -n $line ]]; do
@@ -125,11 +127,11 @@ fi
 if [[ -x $current/bin/teche ]]; then
   exec "$current/bin/teche" "$@"
 fi
-if (( $# == 0 )) || [[ ${1:-} == help || ${1:-} == --help || ${1:-} == -h ]]; then
+if (( $# == 0 )) || [[ ${1:-} == help || ${1:-} == --help || ${1:-} == -help || ${1:-} == -h ]]; then
   usage
   exit 0
 fi
-if (( $# == 1 )) && [[ $1 == ver || $1 == -v || $1 == --version ]]; then
+if (( $# == 1 )) && [[ $1 == ver || $1 == version || $1 == v || $1 == -v || $1 == --version ]]; then
   echo 'TechE platform v1.0; scriptsv1.0 not installed.'
   exit 0
 fi
