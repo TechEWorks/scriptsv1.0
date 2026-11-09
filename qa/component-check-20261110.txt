@@ -1,0 +1,15 @@
+TechE scripts v1.0 component check | 10 November 2026
+
+Scope: private source candidate; no public release or installed ServOS ISO claim.
+
+Input archive SHA-256:
+32f1cda4c473000057671468178c836229b6007410ae2f732cd32f3b3ce7eba4
+
+On the authorized PVE host, the archive was extracted only under /tmp.
+`sha256sum -c SHA256SUMS.txt` passed for all seven listed files.
+`bash -n` passed separately for bootstrap/teche, bin/teche, and each lib/*.sh.
+Calling the bootstrap's verify_tree on the intact extracted tree passed.
+Changing a byte in a copied VERSION file caused verify_tree to reject it.
+
+Still required: public repository fetch on a disposable installed ServOS VM,
+alias/activation/rollback checks, and a new ISO build and installed-machine QA.
