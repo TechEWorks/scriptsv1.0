@@ -1,5 +1,7 @@
 # TechE scripts v1.0
 
+Read [ReadMeFirst.md](ReadMeFirst.md) and the [TechE scripts client policy](https://github.com/TechEWorks/standards/blob/main/TechE%20scripts%20client%20policy.md). The required Debian client package destination is `/teche.scripts/v1.0/`, while `/usr/bin/teche` remains the native full-path command. The older `/usr/lib/teche/scriptsv1.0/` paths described below reflect the current code and must be migrated before this policy can be claimed as implemented. The public package is not yet published.
+
 The private `TechEWorks/scriptsv1.0` repository is the editable source. After QA, its approved files are copied to the public `TechEWorks/release/scriptsv1.0/` folder. No credential is included in either package.
 
 ServOS installs only `bootstrap/teche` as `/usr/bin/teche`. This path is already on the standard OS PATH. The first `sudo teche get scriptsv1.0` downloads the public scripts, checks every file against `SHA256SUMS.txt`, checks the v1.0 version line and shell syntax, and activates them at `/usr/lib/teche/scriptsv1.0/current/`. The full `bin/teche` command is then reached through the same `/usr/bin/teche` entry point.
