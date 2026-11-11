@@ -6,4 +6,4 @@ On each new ServOS Debian client, `/usr/bin/teche` is the native bootstrap and r
 
 Edit and test this repository as source. Publish only approved runtime files and a regenerated `SHA256SUMS.txt` to `TechEWorks/release/scriptsv1.0/`; installed clients pull from that public location. Fetching scripts does not install WorkDesk.
 
-Current implementation gap: `bootstrap/teche`, the ServOS-packaged bootstrap and related QA still use `/usr/lib/teche/scriptsv1.0`. The public package is absent. Do not describe the new client path or pull as deployed until code, manifests, installed-machine QA and publication have been completed.
+The source bootstrap, dispatcher and pull fixture target this path. The ServOS installer source must carry the matching bootstrap. The public package is absent; do not describe the pull as deployed until installed-machine QA and publication have been completed.

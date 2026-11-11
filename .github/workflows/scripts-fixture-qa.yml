@@ -1,0 +1,35 @@
+name: TechE scripts fixture QA
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'bootstrap/**'
+      - 'bin/**'
+      - 'lib/**'
+      - 'qa/pull-fixture-test.sh'
+      - 'README.md'
+      - 'ReadMeFirst.md'
+      - 'VERSION'
+      - 'SHA256SUMS.txt'
+      - '.github/workflows/scripts-fixture-qa.yml'
+  workflow_dispatch:
+
+jobs:
+  pull-fixture:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Verify package and exercise native bootstrap
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          runtime=$(mktemp -d)
+          while IFS= read -r line; do
+            relative=${line#*  }
+            install -d "$runtime/$(dirname "$relative")"
+            cp -a -- "$relative" "$runtime/$relative"
+          done < SHA256SUMS.txt
+          cp -- SHA256SUMS.txt "$runtime/SHA256SUMS.txt"
+          (cd "$runtime" && sha256sum -c SHA256SUMS.txt)
+          sudo bash qa/pull-fixture-test.sh "$runtime"

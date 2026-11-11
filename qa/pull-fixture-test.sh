@@ -11,11 +11,30 @@ source_root=$(realpath "$1")
 test_root=$(mktemp -d /tmp/teche-pull-fixture.XXXXXXXX)
 mkdir -p "$test_root/fixture/scriptsv1.0" \
   "$test_root/logs/operations" "$test_root/logs/audit" \
-  "$test_root/teche" "$test_root/state"
+  "$test_root/teche.scripts"
 cp -a "$source_root/." "$test_root/fixture/scriptsv1.0/"
 chmod 0755 "$test_root/fixture/scriptsv1.0/bin/teche" \
   "$test_root/fixture/scriptsv1.0/bootstrap/teche" \
   "$test_root/fixture/scriptsv1.0/lib/"*.sh
+(cd "$test_root/fixture/scriptsv1.0" && sha256sum -c SHA256SUMS.txt)
+# Rewrite only the fixture dispatcher path, then rehash its fixture manifest.
+python3 - "$test_root/fixture/scriptsv1.0" "$test_root" <<'PY'
+from hashlib import sha256
+from pathlib import Path
+import sys
+package, root = Path(sys.argv[1]), sys.argv[2]
+dispatcher = package / 'bin/teche'
+code = dispatcher.read_text()
+old = 'scripts_base=/teche.scripts/v1.0'
+assert code.count(old) == 1, 'dispatcher path contract changed'
+dispatcher.write_text(code.replace(old, f'scripts_base={root}/teche.scripts/v1.0'))
+manifest = package / 'SHA256SUMS.txt'
+lines = manifest.read_text().splitlines()
+matches = [i for i, line in enumerate(lines) if line.endswith('  bin/teche')]
+assert len(matches) == 1, 'dispatcher manifest entry missing'
+lines[matches[0]] = f"{sha256(dispatcher.read_bytes()).hexdigest()}  bin/teche"
+manifest.write_text('\n'.join(lines) + '\n')
+PY
 (cd "$test_root/fixture/scriptsv1.0" && sha256sum -c SHA256SUMS.txt)
 git -C "$test_root/fixture" init -q -b main
 git -C "$test_root/fixture" add scriptsv1.0
@@ -29,19 +48,15 @@ source, output, root = Path(sys.argv[1]), Path(sys.argv[2]), sys.argv[3]
 code = source.read_text()
 edits = [
     ('repo=https://github.com/TechEWorks/release.git', f'repo=file://{root}/fixture'),
-    ('base=/usr/lib/teche/scriptsv1.0', f'base={root}/teche/scriptsv1.0'),
+    ('base=/teche.scripts/v1.0', f'base={root}/teche.scripts/v1.0'),
     ('root=/techev1.0/servosv1.0/logs', f'root={root}/logs'),
-    ('/usr/lib/teche/', f'{root}/teche/'),
-    ('/var/lib/teche/scriptsv1.0/', f'{root}/state/scriptsv1.0/'),
-    ('install -d -m 0755 /var/lib/teche/scriptsv1.0',
-     f'install -d -m 0755 {root}/state/scriptsv1.0'),
     ('/var/tmp/teche-scriptsv1.0.XXXXXXXX', f'{root}/stage.XXXXXXXX'),
 ]
 for old, new in edits:
     if old not in code:
         raise SystemExit(f'Fixture patch target missing: {old}')
     code = code.replace(old, new)
-for unsafe in ('/usr/lib/teche/', '/var/lib/teche/scriptsv1.0/',
+for unsafe in ('base=/teche.scripts/v1.0',
                '/techev1.0/servosv1.0/logs',
                'https://github.com/TechEWorks/release.git'):
     if unsafe in code:
@@ -58,18 +73,18 @@ grep -q 'scripts not yet installed' "$test_root/help-before.txt"
 grep -q 'not installed' "$test_root/version-before.txt"
 
 "$command_path" get scriptsv1.0 > "$test_root/get.log"
-current=$test_root/teche/scriptsv1.0/current
-[[ -x $current/bin/teche && -L $test_root/teche/wd1.0-menu.sh &&
-   -L $test_root/teche/wd1.0-uninstall.sh ]]
+current=$test_root/teche.scripts/v1.0/current
+[[ -x $current/bin/teche &&
+   -f $test_root/teche.scripts/v1.0/source-commit ]]
 first_target=$(readlink "$current")
 "$command_path" --help > "$test_root/help-after.txt"
 "$command_path" -help > "$test_root/help-alias-after.txt"
 "$command_path" --version > "$test_root/version-after.txt"
 "$command_path" build > "$test_root/build-routes.txt"
-grep -q 'scripts 1.0.6-qa' "$test_root/help-after.txt"
+grep -q 'scripts 1.0.7-qa' "$test_root/help-after.txt"
 grep -q 'txt-network' "$test_root/build-routes.txt"
 grep -q 'gui-offline' "$test_root/build-routes.txt"
-grep -q 'teche scripts version: 1.0.6-qa' "$test_root/version-after.txt"
+grep -q 'teche scripts version: 1.0.7-qa' "$test_root/version-after.txt"
 for args in 'update scriptsv1.0' 'get scripts' 'update scripts'; do
   read -r action target <<< "$args"
   "$command_path" "$action" "$target" >> "$test_root/aliases.log"
@@ -98,4 +113,4 @@ fi
 
 printf 'fixture_pull=pass aliases=pass help=pass version=pass helpers=pass tamper_rejected=pass\n'
 printf 'evidence_dir=%s\n' "$test_root"
-printf 'fixture_source_commit=%s\n' "$(cat "$test_root/state/scriptsv1.0/source-commit")"
+printf 'fixture_source_commit=%s\n' "$(cat "$test_root/teche.scripts/v1.0/source-commit")"

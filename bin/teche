@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Full TechE dispatcher loaded by the ServOS /usr/bin/teche bootstrap.
 set -Eeuo pipefail
-version='1.0.6-qa'
+version='1.0.7-qa'
+scripts_base=/teche.scripts/v1.0
 usage() {
   cat <<'EOF'
 Usage: teche help
@@ -18,7 +19,7 @@ Usage: teche help
        teche uninstall wd1.0
        teche --version | -v | version | ver | v
 
-TechE platform v1.0 | scripts 1.0.6-qa
+TechE platform v1.0 | scripts 1.0.7-qa
 
 Actions: build, get, update, install, uninstall, status
 
@@ -61,8 +62,8 @@ if [[ $# -eq 1 && ( $1 == --version || $1 == -v || $1 == version || $1 == ver ||
     *) printf 'Current OS: %s\n' "${PRETTY_NAME:-unknown}" ;;
   esac
   printf 'teche scripts version: %s\n' "$version"
-  if [[ -r /var/lib/teche/scriptsv1.0/source-commit ]]; then
-    printf 'TechE scripts source commit: %s\n' "$(cat /var/lib/teche/scriptsv1.0/source-commit)"
+  if [[ -r $scripts_base/source-commit ]]; then
+    printf 'TechE scripts source commit: %s\n' "$(cat "$scripts_base/source-commit")"
   else
     echo 'TechE scripts source commit: not recorded on this machine'
   fi
@@ -313,11 +314,11 @@ case $action in
     done
     bash -n "$root/InstallWDOnline/install.sh" \
       "$root/InstallWDOnline/release/install-online.sh" \
-      /usr/lib/teche/wd1.0-menu.sh || { echo 'WorkDesk shell syntax check failed' >&2; exit 65; }
+      "$scripts_base/current/lib/wd1.0-menu.sh" || { echo 'WorkDesk shell syntax check failed' >&2; exit 65; }
     exec bash "$root/InstallWDOnline/install.sh"
     ;;
   uninstall)
-    exec bash /usr/lib/teche/wd1.0-uninstall.sh
+    exec bash "$scripts_base/current/lib/wd1.0-uninstall.sh"
     ;;
 esac
 

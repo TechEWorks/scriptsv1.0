@@ -1,12 +1,12 @@
 # TechE scripts v1.0
 
-Read [ReadMeFirst.md](ReadMeFirst.md) and the [TechE scripts client policy](https://github.com/TechEWorks/standards/blob/main/TechE%20scripts%20client%20policy.md). The required Debian client package destination is `/teche.scripts/v1.0/`, while `/usr/bin/teche` remains the native full-path command. The older `/usr/lib/teche/scriptsv1.0/` paths described below reflect the current code and must be migrated before this policy can be claimed as implemented. The public package is not yet published.
+Read [ReadMeFirst.md](ReadMeFirst.md) and the [TechE scripts client policy](https://github.com/TechEWorks/standards/blob/main/TechE%20scripts%20client%20policy.md). The Debian client package destination is `/teche.scripts/v1.0/`, while `/usr/bin/teche` remains the native full-path command. The public package is not yet published; this source change needs QA on an installed ServOS client.
 
-The private `TechEWorks/scriptsv1.0` repository is the editable source. After QA, its approved files are copied to the public `TechEWorks/release/scriptsv1.0/` folder. No credential is included in either package.
+The `TechEWorks/scriptsv1.0` repository is the editable source. After QA, its approved files are copied to the public `TechEWorks/release/scriptsv1.0/` folder. No credential is included in either package.
 
-ServOS installs only `bootstrap/teche` as `/usr/bin/teche`. This path is already on the standard OS PATH. The first `sudo teche get scriptsv1.0` downloads the public scripts, checks every file against `SHA256SUMS.txt`, checks the v1.0 version line and shell syntax, and activates them at `/usr/lib/teche/scriptsv1.0/current/`. The full `bin/teche` command is then reached through the same `/usr/bin/teche` entry point.
+ServOS installs only `bootstrap/teche` as `/usr/bin/teche`. This path is already on the standard OS PATH. The first `sudo teche get scriptsv1.0` downloads the public scripts, checks every file against `SHA256SUMS.txt`, checks the v1.0 version line and shell syntax, and activates them at `/teche.scripts/v1.0/current/`. The full `bin/teche` command is then reached through the same `/usr/bin/teche` entry point.
 
-`teche get scripts`, `teche update scripts`, and `teche update scriptsv1.0` perform exactly the same refresh as `teche get scriptsv1.0`. A previous revision remains in `/usr/lib/teche/scriptsv1.0/releases/`. Existing legacy WorkDesk helper files are backed up before replacement. The WorkDesk package catalog is not overwritten; its URL and SHA-256 must be configured separately before installing WorkDesk.
+`teche get scripts`, `teche update scripts`, and `teche update scriptsv1.0` perform exactly the same refresh as `teche get scriptsv1.0`. A previous revision remains in `/teche.scripts/v1.0/releases/`. Existing legacy WorkDesk helper files outside the scripts package are left untouched. The WorkDesk package catalog is not overwritten; its URL and SHA-256 must be configured separately before installing WorkDesk.
 
 The bootstrap reads only the public release repository. This means a user of ServOS or WorkDesk needs no private GitHub access to obtain scripts. On first use, the bootstrap installs Git through Debian APT if Git is absent. It needs network access, a working APT mirror for that case, and trusted CA certificates.
 
@@ -17,7 +17,7 @@ The bootstrap reads only the public release repository. This means a user of Ser
 - `lib/`: WorkDesk helper scripts downloaded with the dispatcher.
 - `VERSION`: same-major version gate.
 - `SHA256SUMS.txt`: hashes of every published file except the manifest itself.
-- `qa/`: component checks kept in the private source repository.
+- `qa/`: component checks kept in the source repository.
 
 `teche help`, `teche --help`, `teche -help`, `teche -h`, and bare `teche` show the available commands. Before activation they show the bootstrap commands; after activation they show the full installed command set and script version. `teche ver` or `teche --version` shows platform, scripts, source commit, Debian base and WorkDesk install status. `teche build` lists registered build routes. The current QA build catalog lists WD(txt) network and WD(gui) offline only; WD(gui) network remains withheld. A build command is not a release approval.
 

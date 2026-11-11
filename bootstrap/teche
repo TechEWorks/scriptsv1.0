@@ -2,7 +2,7 @@
 # ServOS keeps this command; product scripts live in the public release catalog.
 set -Eeuo pipefail
 repo=https://github.com/TechEWorks/release.git
-base=/usr/lib/teche/scriptsv1.0
+base=/teche.scripts/v1.0
 current=$base/current
 stage=''
 refresh_started=0
@@ -65,7 +65,7 @@ verify_tree() {
   done
 }
 refresh() {
-  local src commit release candidate link old backup
+  local src commit release candidate link old
   if (( $(id -u) != 0 )); then
     command -v sudo >/dev/null || { echo 'sudo is required.' >&2; return 77; }
     exec sudo -- "$0" "$@"
@@ -98,21 +98,10 @@ refresh() {
   fi
   [[ ! -e $current || -L $current ]] ||
     { echo 'Existing scripts path is not a link.' >&2; return 73; }
-  backup=/var/lib/teche/scriptsv1.0/legacy-$(date -u +%Y%m%dT%H%M%SZ)-$$
-  for old in wd1.0-menu.sh wd1.0-uninstall.sh; do
-    if [[ -f /usr/lib/teche/$old && ! -L /usr/lib/teche/$old ]]; then
-      install -d -m 0700 "$backup"
-      cp -a -- "/usr/lib/teche/$old" "$backup/$old"
-    fi
-  done
-  link=$base/.current.$$
+  link=$base/.current.$
   ln -s "$release" "$link"
   mv -Tf -- "$link" "$current"
-  for old in wd1.0-menu.sh wd1.0-uninstall.sh; do
-    ln -sfn "$current/lib/$old" "/usr/lib/teche/$old"
-  done
-  install -d -m 0755 /var/lib/teche/scriptsv1.0
-  printf '%s\n' "$commit" > /var/lib/teche/scriptsv1.0/source-commit
+  printf '%s\n' "$commit" > "$base/source-commit"
   printf 'TechE scripts %s active from public release commit %s\n' \
     "$(cat "$current/VERSION")" "$commit"
   refresh_succeeded=1
