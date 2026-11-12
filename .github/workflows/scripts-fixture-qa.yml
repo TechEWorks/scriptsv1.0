@@ -4,14 +4,12 @@ on:
   push:
     branches: [main]
     paths:
-      - 'bootstrap/**'
-      - 'bin/**'
-      - 'lib/**'
-      - 'qa/pull-fixture-test.sh'
+      - '03-beta/src/**'
+      - '03-beta/packaging/**'
+      - '03-beta/tests/**'
+      - '03-beta/ReadMeFirst.txt'
       - 'README.md'
-      - 'ReadMeFirst.md'
-      - 'VERSION'
-      - 'SHA256SUMS.txt'
+      - 'ReadMeFirst.txt'
       - '.github/workflows/scripts-fixture-qa.yml'
   workflow_dispatch:
 
@@ -20,16 +18,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - name: Verify package and exercise native bootstrap
+      - name: Assemble runtime and exercise native bootstrap
         shell: bash
         run: |
           set -Eeuo pipefail
+          for script in 03-beta/packaging/assemble-runtime.sh 03-beta/src/bootstrap/teche 03-beta/src/bin/teche 03-beta/src/lib/*.sh 03-beta/tests/pull-fixture-test.sh; do
+            bash -n "$script"
+          done
           runtime=$(mktemp -d)
-          while IFS= read -r line; do
-            relative=${line#*  }
-            install -d "$runtime/$(dirname "$relative")"
-            cp -a -- "$relative" "$runtime/$relative"
-          done < SHA256SUMS.txt
-          cp -- SHA256SUMS.txt "$runtime/SHA256SUMS.txt"
+          bash 03-beta/packaging/assemble-runtime.sh "$runtime"
           (cd "$runtime" && sha256sum -c SHA256SUMS.txt)
-          sudo bash qa/pull-fixture-test.sh "$runtime"
+          sudo bash 03-beta/tests/pull-fixture-test.sh "$runtime"
