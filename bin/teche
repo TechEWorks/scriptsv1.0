@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Full TechE dispatcher loaded by the ServOS /usr/bin/teche bootstrap.
 set -Eeuo pipefail
-version='1.0.7-qa'
+version='1.0.8-qa'
 scripts_base=/teche.scripts/v1.0
 usage() {
   cat <<'EOF'
@@ -19,7 +19,7 @@ Usage: teche help
        teche uninstall wd1.0
        teche --version | -v | version | ver | v
 
-TechE platform v1.0 | scripts 1.0.7-qa
+TechE platform v1.0 | scripts 1.0.8-qa
 
 Actions: build, get, update, install, uninstall, status
 
@@ -290,9 +290,11 @@ get_pack() {
 
 case $action in
   status)
-    if [[ -f $cache && -s $hash_file ]] &&
-       printf '%s  %s\n' "$(tr -d '[:space:]' < "$hash_file")" "$cache" |
-       sha256sum -c - --status; then
+    if [[ $(id -u) -ne 0 ]]; then
+      echo 'wd1.0: package cache is private; run sudo teche status wd1.0 to verify it'
+    elif [[ -f $cache && -s $hash_file ]] &&
+         printf '%s  %s\n' "$(tr -d '[:space:]' < "$hash_file")" "$cache" |
+         sha256sum -c - --status; then
       echo 'wd1.0: verified ZIP cached'
     else
       echo 'wd1.0: run sudo teche get wd1.0'
