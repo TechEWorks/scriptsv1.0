@@ -8,4 +8,3 @@ Candidate preparation date: 2026-11-12 UTC. Production release date: pending app
 | `src/bin/teche` → public `scriptsv1.0/bin/teche` | Scripts help and version dispatcher | 1.0.7 | 2026-11-12 UTC | Pending |
 
 The generated `SHA256SUMS.txt` and `VERSION` are package metadata. `packaging/assemble-runtime.sh` and `tests/pull-fixture-test.sh` are source engineering tools, not client release code. After release approval, record the exact source commit, public release commit, ISO SHA-256, and publication date in the release-specific packet. Do not backdate a production release.
-
