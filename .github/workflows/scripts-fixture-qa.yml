@@ -13,6 +13,18 @@ on:
       - 'VERSION'
       - 'SHA256SUMS.txt'
       - '.github/workflows/scripts-fixture-qa.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'bootstrap/**'
+      - 'bin/**'
+      - 'lib/**'
+      - 'qa/pull-fixture-test.sh'
+      - 'README.md'
+      - 'ReadMeFirst.md'
+      - 'VERSION'
+      - 'SHA256SUMS.txt'
+      - '.github/workflows/scripts-fixture-qa.yml'
   workflow_dispatch:
 
 jobs:
