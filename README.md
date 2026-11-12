@@ -1,6 +1,6 @@
 # TechE scripts v1.0
 
-Read [ReadMeFirst.md](ReadMeFirst.md) and the [TechE scripts client policy](https://github.com/TechEWorks/standards/blob/main/TechE%20scripts%20client%20policy.md). The Debian client package destination is `/teche.scripts/v1.0/`, while `/usr/bin/teche` remains the native full-path command. The public package is not yet published; this source change needs QA on an installed ServOS client.
+Read [ReadMeFirst.md](ReadMeFirst.md) and the [TechE scripts client policy](https://github.com/TechEWorks/standards/blob/main/TechE%20scripts%20client%20policy.md). The Debian client package destination is `/teche.scripts/v1.0/`, while `/usr/bin/teche` remains the native full-path command. Public availability and installed-client QA must be checked against the exact approved runtime before claiming deployment.
 
 The `TechEWorks/scriptsv1.0` repository is the editable source. After QA, its approved files are copied to the public `TechEWorks/release/scriptsv1.0/` folder. No credential is included in either package.
 
