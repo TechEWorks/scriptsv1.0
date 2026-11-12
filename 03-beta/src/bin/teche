@@ -1,324 +1,48 @@
 #!/usr/bin/env bash
-# Full TechE dispatcher loaded by the ServOS /usr/bin/teche bootstrap.
+# TechE.Works | ServOS v1.0 scripts dispatcher | source version 1.0.7
+# Candidate prepared 2026-11-12 UTC; production release date pending.
+# ServOS scripts dispatcher loaded by the /usr/bin/teche bootstrap.
 set -Eeuo pipefail
-version='1.0.7-qa'
 scripts_base=/teche.scripts/v1.0
+version_file=$(dirname -- "$(dirname -- "$(readlink -f -- "$0")")")/VERSION
+[[ -r $version_file ]] || { echo 'TechE scripts VERSION is missing.' >&2; exit 65; }
+version=$(cat "$version_file")
+
 usage() {
-  cat <<'EOF'
-Usage: teche help
-       teche --help | -help | -h
-       teche get scriptsv1.0
-       teche update scriptsv1.0
-       teche get scripts | teche update scripts
-       teche get wd1.0
-       teche get wd1.0 source
-       teche build wd1.0iso txt-network [absolute-output.iso]
-       teche build wd1.0iso gui-offline [absolute-output.iso]
-       teche install wd1.0
-       teche status wd1.0
-       teche uninstall wd1.0
-       teche --version | -v | version | ver | v
-
-TechE platform v1.0 | scripts 1.0.7-qa
-
-Actions: build, get, update, install, uninstall, status
-
-The /usr/bin/teche bootstrap fetches public versioned scripts and activates
-them on the current machine. Both get and update perform the same refresh.
-build wd1.0iso creates a route-specific QA ISO from this private checkout on
-      Debian 13; it does not install WorkDesk. Use 'teche build' to list routes.
-Build availability does not imply release QA approval.
-get without 'source' verifies and caches the install pack on this machine.
-get with 'source' clones private Git build source and pinned inputs into
-    ./workdeskv1.0; authenticate to GitHub and install git/git-lfs first.
-install gets the pack if needed, then provisions WorkDesk on the CURRENT
-        machine. It does not create an ISO.
-uninstall is not release-qualified and refuses to remove the installation.
-status reports the current machine's pack and install receipt, not ISO QA.
-Build requests sudo when needed. Install-pack get/install/uninstall require root.
+  cat <<EOF
+TechE platform v1.0 | scripts $version
+  teche help | --help | -help  Show these commands.
+  teche ver | --version       Show OS and scripts versions.
+  teche get scriptsv1.0       Fetch, verify and activate public scripts.
+  teche update scriptsv1.0    Refresh the same scripts.
+  teche get scripts           Alias for get scriptsv1.0.
+  teche update scripts        Alias for update scriptsv1.0.
+  teche rollback scriptsv1.0  Activate the retained previous revision.
 EOF
 }
-# List registered build targets without starting a build or touching disks.
-list_builds() {
-  cat <<'EOF'
-Available build targets (run from a private WorkDesk Git checkout on Debian 13):
-  wd1.0iso
-    txt-network   WD(txt) network QA ISO; requires pinned source and inputs
-    gui-offline   QA builder available; requires pinned GUI inputs
 
-Build availability is separate from QA status for each exact ISO.
-Usage: teche build wd1.0iso {txt-network|gui-offline} [absolute-output.iso]
-No other build targets are registered in this script.
-EOF
-}
-(( $# == 0 )) && { usage; exit 0; }
-[[ $# -eq 1 && ( $1 == --help || $1 == -help || $1 == -h || $1 == help ) ]] && { usage; exit 0; }
-if [[ $# -eq 1 && ( $1 == --version || $1 == -v || $1 == version || $1 == ver || $1 == v ) ]]; then
+if (( $# == 0 )) || [[ $# == 1 && ( $1 == help || $1 == --help || $1 == -help || $1 == -h ) ]]; then
+  usage
+  exit 0
+fi
+if (( $# == 1 )) && [[ $1 == ver || $1 == version || $1 == v || $1 == -v || $1 == --version ]]; then
   printf 'TechE platform: v1.0\n'
   if [[ -r /etc/os-release ]]; then . /etc/os-release; fi
   case ${ID:-} in
     teche-servos) echo 'Current OS: TechE ServOS v1.0' ;;
-    teche-workdesk) echo 'Current OS: TechE WorkDesk v1.0' ;;
     *) printf 'Current OS: %s\n' "${PRETTY_NAME:-unknown}" ;;
   esac
   printf 'teche scripts version: %s\n' "$version"
-  if [[ -r $scripts_base/source-commit ]]; then
-    printf 'TechE scripts source commit: %s\n' "$(cat "$scripts_base/source-commit")"
+  active=$(readlink -f -- "$scripts_base/current" 2>/dev/null || true)
+  commit=${active##*/}
+  if [[ $active == "$scripts_base/releases/$commit" &&
+        $commit =~ ^[0-9a-f]{40}$ ]]; then
+    printf 'TechE scripts source commit: %s\n' "$commit"
   else
     echo 'TechE scripts source commit: not recorded on this machine'
   fi
   printf 'Debian base: %s\n' "$(cat /etc/debian_version 2>/dev/null || printf 'not installed')"
-  if [[ -f /var/lib/teche-workdesk/install-receipt-v1.txt ]]; then
-    echo 'WorkDesk wd1.0: installation recorded'
-  else
-    echo 'WorkDesk wd1.0: installation not recorded'
-  fi
   exit 0
 fi
-if [[ ${1:-} == build ]]; then
-  if (( $# == 1 )) || [[ $# == 2 && ( $2 == wd1.0iso || $2 == --help ) ]] || [[ $# == 3 && $2 == wd1.0iso && $3 == --help ]]; then
-    list_builds
-    exit 0
-  fi
-  if (( $# < 3 || $# > 4 )) || [[ ${2:-} != wd1.0iso ]]; then
-    echo 'Use teche build wd1.0iso {txt-network|gui-offline} [absolute-output.iso]' >&2
-    exit 2
-  fi
-  case $3 in
-    txt-network) ;;
-    gui-network)
-      echo 'WD(gui) network is not in the QA-ready build catalog.' >&2
-      exit 78
-      ;;
-    gui-offline)
-      gui_route=$3
-      if [[ $(id -u) -ne 0 ]]; then
-        command -v sudo >/dev/null || { echo 'Install sudo or run as root to build the ISO.' >&2; exit 77; }
-        exec sudo -- "$0" "$@"
-      fi
-      location=$(cd -- "$PWD" && pwd -P)
-      while :; do
-        gui_builder="$location/02-alpha/delivery/gui-common/build/build-from-debian.sh"
-        if [[ -f $gui_builder && -e $location/.git ]]; then break; fi
-        [[ $location != / ]] || { echo 'Run the GUI build inside the private WorkDesk Git checkout.' >&2; exit 2; }
-        location=$(dirname -- "$location")
-      done
-      output=${4:-"$location/out/TechE-WDgui-${gui_route#gui-}-v1.0-QA-$(date -u +%Y%m%dT%H%M%SZ).iso"}
-      [[ $output = /* ]] || { echo 'Output ISO path must be absolute.' >&2; exit 2; }
-      exec bash "$gui_builder" "$gui_route" "$output"
-      ;;
-    *) echo "Unknown WorkDesk ISO route: $3" >&2; exit 2 ;;
-  esac
-  if (( $# == 4 )); then set -- build wd1.0 "$4"; else set -- build wd1.0; fi
-fi
-[[ $# -ge 2 && $# -le 3 ]] || { usage >&2; exit 2; }
-action=$1 package=$2
-[[ $package == wd1.0 ]] || { printf 'Unknown package: %s\n' "$package" >&2; exit 2; }
-[[ $action == build || $action == get || $action == install || $action == uninstall || $action == status ]] || { usage >&2; exit 2; }
-[[ $# -eq 2 || ( $action == get && ${3:-} == source ) || $action == build ]] || { usage >&2; exit 2; }
-
-# Source retrieval never calls the current-machine WorkDesk pack or installer.
-if [[ $action == get && $# -eq 3 ]]; then
-  for tool in git sha256sum mktemp; do
-    command -v "$tool" >/dev/null || { echo "Install $tool before getting build source." >&2; exit 69; }
-  done
-  git lfs version >/dev/null 2>&1 || { echo 'Install git-lfs before getting build source.' >&2; exit 69; }
-  destination="$PWD/workdeskv1.0"
-  [[ ! -e $destination && ! -L $destination ]] || { echo "Destination already exists: $destination" >&2; exit 73; }
-  stage=$(mktemp -d "$PWD/.wd1.0-source.XXXXXXXX")
-  trap 'rm -rf -- "$stage"' EXIT
-  GIT_LFS_SKIP_SMUDGE=1 git clone --filter=blob:none --sparse \
-    https://github.com/TechEWorks/workdeskv1.0.git "$stage/repo"
-  (
-    cd "$stage/repo"
-    git sparse-checkout set \
-      02-alpha/delivery/gui-common \
-      02-alpha/delivery/wd-gui-offline \
-      02-alpha/delivery/wd-txt-network/build \
-      02-alpha/delivery/wd-txt-network/src/combined-installer \
-      02-alpha/packaging/inputs/servos
-    git lfs pull --include='02-alpha/packaging/inputs/servos/TechE-ServOS-13.7-v1.0-v69w-clean-signatures.iso,02-alpha/delivery/wd-txt-network/src/combined-installer/payload/InstallWDOnline-wd1.0-core.zip' --exclude=''
-  )
-  base="$stage/repo/02-alpha/packaging/inputs/servos/TechE-ServOS-13.7-v1.0-v69w-clean-signatures.iso"
-  core="$stage/repo/02-alpha/delivery/wd-txt-network/src/combined-installer/payload/InstallWDOnline-wd1.0-core.zip"
-  printf '%s  %s\n' bb2c24bd202498052d544e3b7db431c34dce766edb841dad6eff94dcbbc486ea "$base" | sha256sum -c - --status || { echo 'Pinned ServOS build input failed SHA-256.' >&2; exit 65; }
-  printf '%s  %s\n' 4222728c9b4313fd56657291ac3dfa141421f5dec91b263dfe27499708590128 "$core" | sha256sum -c - --status || { echo 'Pinned WorkDesk core failed SHA-256.' >&2; exit 65; }
-  mv -- "$stage/repo" "$destination"
-  rmdir -- "$stage"
-  trap - EXIT
-  printf 'WD(txt) build source: %s\nGit commit: ' "$destination"
-  git -C "$destination" rev-parse HEAD
-  exit 0
-fi
-if [[ $action == build && $(id -u) -ne 0 ]]; then
-  command -v sudo >/dev/null || { echo 'Install sudo or run as root to build the ISO.' >&2; exit 77; }
-  exec sudo -- "$0" "$@"
-fi
-if [[ $action != status && $(id -u) -ne 0 ]]; then
-  printf 'Run as root: sudo teche %s %s\n' "$action" "$package" >&2
-  exit 77
-fi
-
-# The build command is a Debian builder operation. It is intentionally handled
-# before the installed-machine pack catalog and never calls the install path.
-if [[ $action == build ]]; then
-  location=$PWD
-  location=$(cd -- "$location" && pwd -P)
-  while :; do
-    builder="$location/02-alpha/delivery/wd-txt-network/build/build-on-debian.sh"
-    if [[ -f $builder && -e $location/.git ]]; then
-      break
-    fi
-    [[ $location != / ]] || {
-      echo 'Run teche build wd1.0iso txt-network from inside the private WorkDesk Git checkout.' >&2
-      exit 2
-    }
-    location=$(dirname -- "$location")
-  done
-  if [[ $# -eq 3 ]]; then
-    output=$3
-  else
-    stamp=$(date -u +%Y%m%dT%H%M%SZ)
-    output="$location/out/TechE-WDtxt-Network-v1.0-QA-$stamp.iso"
-  fi
-  [[ $output = /* ]] || { echo 'Output ISO path must be absolute.' >&2; exit 2; }
-  printf 'Building WD(txt) network QA ISO: %s\n' "$output"
-  exec bash "$builder" "$output"
-fi
-
-catalog=/etc/teche/packages.d
-cache=/var/cache/teche/packs/wd1.0.zip
-root=/var/lib/teche/packs/wd1.0
-url_file=$catalog/wd1.0.url
-hash_file=$catalog/wd1.0.sha256
-
-ensure_tools() {
-  local missing=() tool
-  for tool in "$@"; do
-    command -v "$tool" >/dev/null || missing+=("$tool")
-  done
-  (( ${#missing[@]} == 0 )) && return 0
-  command -v apt-get >/dev/null || { echo 'APT is required to fetch setup tools' >&2; return 69; }
-  apt-get update
-  DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends "${missing[@]}"
-}
-
-ensure_menu_catalogs() {
-  local packages=()
-  command -v tput >/dev/null || packages+=(ncurses-bin)
-  command -v python3 >/dev/null || packages+=(python3)
-  command -v curl >/dev/null || packages+=(curl)
-  command -v gpg >/dev/null || packages+=(gpg)
-  command -v pgrep >/dev/null || packages+=(procps)
-  [[ -s /usr/share/i18n/SUPPORTED ]] || packages+=(locales)
-  [[ -s /usr/share/iso-codes/json/iso_3166-1.json &&
-     -s /usr/share/iso-codes/json/iso_639-3.json ]] || packages+=(iso-codes)
-  [[ -s /usr/share/X11/xkb/rules/base.lst ]] || packages+=(xkb-data)
-  [[ -s /usr/share/zoneinfo/zone.tab ]] || packages+=(tzdata)
-  (( ${#packages[@]} == 0 )) && return 0
-  apt-get update
-  DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends "${packages[@]}"
-}
-
-verify_pack() {
-  local pack=$1 expected actual
-  [[ -d $pack && ! -L $pack && -f $pack/MANIFEST.json &&
-     -f $pack/install.sh && -f $pack/release/install-online.sh ]] || return 1
-  (cd "$pack" && jq -r '.files[] | "\(.sha256)  \(.path)"' MANIFEST.json |
-    sha256sum -c - --status) || return 1
-  expected=$(jq '.files | length' "$pack/MANIFEST.json")
-  actual=$(find "$pack" -type f ! -name MANIFEST.json | wc -l)
-  [[ $expected -eq $actual ]]
-}
-
-get_pack() {
-  [[ -s $url_file && -s $hash_file ]] || {
-    echo 'ServOS wd1.0 catalog is missing a download URL or SHA256' >&2; return 78;
-  }
-  local url sha
-  url=$(cat "$url_file")
-  sha=$(tr -d '[:space:]' < "$hash_file")
-  [[ $sha =~ ^[0-9a-fA-F]{64}$ ]] || { echo 'Invalid catalog SHA256' >&2; return 78; }
-  if [[ -d $root/InstallWDOnline ]]; then
-    ensure_tools jq unzip
-    verify_pack "$root/InstallWDOnline" || {
-      echo 'Existing WorkDesk pack failed verification; inspect it before retrying' >&2; return 65;
-    }
-    if [[ -f $cache ]] &&
-       printf '%s  %s\n' "$sha" "$cache" | sha256sum -c - --status; then
-      echo 'wd1.0: verified core pack already cached'
-      return 0
-    fi
-    echo 'WorkDesk extract exists but its verified ZIP cache is missing' >&2
-    return 73
-  fi
-  [[ ! -e $root ]] || { echo 'Incomplete WorkDesk cache needs operator review' >&2; return 73; }
-  ensure_tools jq unzip
-  case $url in
-    https://*) ensure_tools curl ;;
-    file:///usr/share/teche/packs/*) ;;
-    *) echo 'Catalog URL must be HTTPS or an explicit local pack' >&2; return 78 ;;
-  esac
-  install -d -m 0755 "$(dirname "$cache")" "$(dirname "$root")"
-  temp=$(mktemp "${cache}.download.XXXXXX")
-  stage=$(mktemp -d "${root}.extract.XXXXXX")
-  trap 'rm -f -- "$temp"; rm -rf -- "$stage"' EXIT
-  case $url in
-    https://*) curl --fail --location --proto '=https' --proto-redir '=https' \
-                --tlsv1.2 --retry 3 --output "$temp" "$url" ;;
-    file:///usr/share/teche/packs/*) cp -- "${url#file://}" "$temp" ;;
-  esac
-  printf '%s  %s\n' "$sha" "$temp" | sha256sum -c - --status || {
-    echo 'Pack SHA256 mismatch' >&2; return 65;
-  }
-  unzip -tqq "$temp"
-  unzip -Z1 "$temp" | awk '
-    $0 !~ /^InstallWDOnline\// || $0 ~ /(^|\/)\.\.(\/|$)/ ||
-    $0 ~ /\\/ || $0 ~ /\/\// { bad=1 }
-    END { exit bad ? 1 : 0 }
-  ' || { echo 'Unsafe pack member path' >&2; return 65; }
-  unzip -q "$temp" -d "$stage"
-  verify_pack "$stage/InstallWDOnline" || {
-    echo 'Pack manifest verification failed' >&2; return 65;
-  }
-  install -m 0644 "$temp" "$cache"
-  mv -- "$stage" "$root"
-  rm -f -- "$temp"
-  trap - EXIT
-  echo "wd1.0: verified core pack ready at $root/InstallWDOnline"
-}
-
-case $action in
-  status)
-    if [[ -f $cache && -s $hash_file ]] &&
-       printf '%s  %s\n' "$(tr -d '[:space:]' < "$hash_file")" "$cache" |
-       sha256sum -c - --status; then
-      echo 'wd1.0: verified ZIP cached'
-    else
-      echo 'wd1.0: run sudo teche get wd1.0'
-    fi
-    [[ -f /var/lib/teche-workdesk/install-receipt-v1.txt ]] &&
-      echo 'wd1.0: installation recorded' || echo 'wd1.0: no completed installation receipt'
-    ;;
-  get)
-    get_pack
-    ;;
-  install)
-    [[ ! -f /var/lib/teche-workdesk/install-receipt-v1.txt ]] || {
-      echo 'wd1.0 is already recorded as installed' >&2; exit 73;
-    }
-    get_pack
-    ensure_menu_catalogs
-    for tool in python3 curl gpg pgrep tput fold jq unzip; do
-      command -v "$tool" >/dev/null || { echo "Missing WorkDesk bootstrap tool: $tool" >&2; exit 69; }
-    done
-    bash -n "$root/InstallWDOnline/install.sh" \
-      "$root/InstallWDOnline/release/install-online.sh" \
-      "$scripts_base/current/lib/wd1.0-menu.sh" || { echo 'WorkDesk shell syntax check failed' >&2; exit 65; }
-    exec bash "$root/InstallWDOnline/install.sh"
-    ;;
-  uninstall)
-    exec bash "$scripts_base/current/lib/wd1.0-uninstall.sh"
-    ;;
-esac
-
+usage >&2
+exit 2

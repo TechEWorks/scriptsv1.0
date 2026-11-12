@@ -6,13 +6,13 @@ This repository contains the editable Beta source. GitHub still reports this rep
 
 ## Layout
 
-- `03-beta/src/` — sole editable runtime source: `bootstrap/teche`, `bin/teche`, `lib/*.sh`, and `VERSION`.
+- `03-beta/src/` — sole editable runtime source: `bootstrap/teche`, `bin/teche`, and `VERSION`.
 - `03-beta/packaging/assemble-runtime.sh` — creates an allowlisted runtime tree and its SHA-256 manifest.
 - `03-beta/tests/pull-fixture-test.sh` — source fixture test.
 - `03-beta/qa/` — historical candidate evidence; the 2026-11-10 results cover 1.0.6-qa.
 - `.github/workflows/scripts-fixture-qa.yml` — assembles and checks the current source candidate.
 
-The generated runtime package contains only `bootstrap/`, `bin/`, `lib/`, `VERSION`, and `SHA256SUMS.txt`. The source packet and QA records never belong in the public runtime folder.
+The generated runtime package contains exactly `bootstrap/teche`, `bin/teche`, `VERSION`, and `SHA256SUMS.txt`. The source packet and QA records never belong in the public runtime folder.
 
 ## Debian client contract
 
@@ -24,4 +24,4 @@ The bootstrap reads only the public release repository, so clients need no priva
 
 ## Current qualification
 
-The source fixture CI checks assembly, hashes, aliases, help, version, helper syntax, and tamper rejection. It does not prove an HTTPS pull from `release`, a newly built ServOS ISO, or installed-machine acceptance for 1.0.7-qa. After current Beta QA and approval, publish the generated runtime bytes to `release/scriptsv1.0/` and test on a disposable installed ServOS machine before release.
+The source fixture checks assembly, hashes, aliases, help, version, exact four-file scope, two-revision update/retention, concurrent update locking, explicit rollback, failed activation, active source-commit reporting, and tamper rejection. It does not prove an HTTPS pull from `release/main`, a newly built ServOS ISO, or installed-machine acceptance for proposed production runtime 1.0.7. After rights, review and release approval, publish the generated runtime bytes to `release/scriptsv1.0/` and test on a disposable installed ServOS machine before release.

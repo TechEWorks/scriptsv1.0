@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # Exercises the public-folder pull path against a local Git fixture under /tmp.
-# No ServOS system files, disks or installed WorkDesk are changed.
+# No ServOS system files or disks are changed.
 set -Eeuo pipefail
 [[ $(id -u) == 0 && $# == 1 && -f $1/SHA256SUMS.txt ]] || {
   echo 'Usage: root pull-fixture-test.sh /path/to/extracted/runtime-package' >&2
   exit 2
 }
-for tool in git python3 sha256sum; do command -v "$tool" >/dev/null || exit 69; done
+for tool in git python3 sha256sum flock; do command -v "$tool" >/dev/null || exit 69; done
 source_root=$(realpath "$1")
 test_root=$(mktemp -d /tmp/teche-pull-fixture.XXXXXXXX)
 mkdir -p "$test_root/fixture/scriptsv1.0" \
@@ -14,8 +14,7 @@ mkdir -p "$test_root/fixture/scriptsv1.0" \
   "$test_root/teche.scripts"
 cp -a "$source_root/." "$test_root/fixture/scriptsv1.0/"
 chmod 0755 "$test_root/fixture/scriptsv1.0/bin/teche" \
-  "$test_root/fixture/scriptsv1.0/bootstrap/teche" \
-  "$test_root/fixture/scriptsv1.0/lib/"*.sh
+  "$test_root/fixture/scriptsv1.0/bootstrap/teche"
 (cd "$test_root/fixture/scriptsv1.0" && sha256sum -c SHA256SUMS.txt)
 # Rewrite only the fixture dispatcher path, then rehash its fixture manifest.
 python3 - "$test_root/fixture/scriptsv1.0" "$test_root" <<'PY'
@@ -75,31 +74,113 @@ grep -q 'not installed' "$test_root/version-before.txt"
 "$command_path" get scriptsv1.0 > "$test_root/get.log"
 current=$test_root/teche.scripts/v1.0/current
 [[ -x $current/bin/teche &&
-   -f $test_root/teche.scripts/v1.0/source-commit ]]
+   ! -e $test_root/teche.scripts/v1.0/source-commit ]]
 first_target=$(readlink "$current")
+first_commit=${first_target##*/}
 "$command_path" --help > "$test_root/help-after.txt"
 "$command_path" -help > "$test_root/help-alias-after.txt"
 "$command_path" --version > "$test_root/version-after.txt"
-"$command_path" build > "$test_root/build-routes.txt"
-grep -q 'scripts 1.0.7-qa' "$test_root/help-after.txt"
-grep -q 'txt-network' "$test_root/build-routes.txt"
-grep -q 'gui-offline' "$test_root/build-routes.txt"
-grep -q 'teche scripts version: 1.0.7-qa' "$test_root/version-after.txt"
+grep -Fxq 'TechE platform v1.0 | scripts 1.0.7' "$test_root/help-after.txt"
+grep -Fxq 'teche scripts version: 1.0.7' "$test_root/version-after.txt"
+grep -Fxq "TechE scripts source commit: $first_commit" "$test_root/version-after.txt"
+if grep -qi 'workdesk\|wd1.0' "$test_root/help-after.txt"; then
+  echo 'WorkDesk command leaked into ServOS scripts help' >&2
+  exit 65
+fi
+if "$command_path" get wd1.0 > "$test_root/unsupported-product.log" 2>&1; then
+  echo 'Unsupported product command was accepted' >&2
+  exit 65
+fi
 for args in 'update scriptsv1.0' 'get scripts' 'update scripts'; do
   read -r action target <<< "$args"
   "$command_path" "$action" "$target" >> "$test_root/aliases.log"
   [[ $(readlink "$current") == "$first_target" ]]
 done
 
-set +e
-"$current/lib/wd1.0-menu.sh" > "$test_root/menu-no-pack.log" 2>&1
-menu_status=$?
-"$current/lib/wd1.0-uninstall.sh" > "$test_root/uninstall-refusal.log" 2>&1
-uninstall_status=$?
-set -e
-[[ $menu_status == 2 && $uninstall_status == 78 ]]
-bash -n "$current/lib/wd1.0-menu.sh"
-bash -n "$current/lib/wd1.0-uninstall.sh"
+[[ ! -d $current/lib ]]
+
+# A second valid public commit must retain the first revision and report
+# its active commit from the symlink, without a separate metadata file.
+python3 - "$test_root/fixture/scriptsv1.0" <<'PY'
+from hashlib import sha256
+from pathlib import Path
+import sys
+package = Path(sys.argv[1])
+version = package / 'VERSION'
+version.write_text('1.0.8\n')
+manifest = package / 'SHA256SUMS.txt'
+lines = manifest.read_text().splitlines()
+matches = [i for i, line in enumerate(lines) if line.endswith('  VERSION')]
+assert len(matches) == 1
+lines[matches[0]] = f"{sha256(version.read_bytes()).hexdigest()}  VERSION"
+manifest.write_text('\n'.join(lines) + '\n')
+PY
+git -C "$test_root/fixture" add scriptsv1.0/VERSION scriptsv1.0/SHA256SUMS.txt
+git -C "$test_root/fixture" -c user.name='TechE QA' \
+  -c user.email='qa@localhost' commit -qm second-valid-revision
+"$command_path" update scriptsv1.0 > "$test_root/update-second-a.log" &
+first_update_pid=$!
+"$command_path" update scriptsv1.0 > "$test_root/update-second-b.log" &
+second_update_pid=$!
+wait "$first_update_pid"
+wait "$second_update_pid"
+second_target=$(readlink "$current")
+second_commit=${second_target##*/}
+[[ $second_target != "$first_target" &&
+   -d $first_target && -d $second_target &&
+   $(readlink "$test_root/teche.scripts/v1.0/rollback/$second_commit") == "$first_target" ]]
+[[ $(find "$test_root/teche.scripts/v1.0/releases" -mindepth 1 -maxdepth 1 -type d | wc -l) -eq 2 &&
+   -z $(find "$test_root/teche.scripts/v1.0/releases" -maxdepth 1 -name '.incoming.*' -print -quit) ]]
+"$command_path" ver > "$test_root/version-second.txt"
+grep -Fxq 'teche scripts version: 1.0.8' "$test_root/version-second.txt"
+grep -Fxq "TechE scripts source commit: $second_commit" "$test_root/version-second.txt"
+
+# Inject failure of current activation for a third valid commit. Its prepared
+# rollback entry must not replace the second commit's retained first revision.
+python3 - "$test_root/fixture/scriptsv1.0" <<'PY'
+from hashlib import sha256
+from pathlib import Path
+import sys
+package = Path(sys.argv[1])
+version = package / 'VERSION'
+version.write_text('1.0.9\n')
+manifest = package / 'SHA256SUMS.txt'
+lines = manifest.read_text().splitlines()
+matches = [i for i, line in enumerate(lines) if line.endswith('  VERSION')]
+assert len(matches) == 1
+lines[matches[0]] = f"{sha256(version.read_bytes()).hexdigest()}  VERSION"
+manifest.write_text('\n'.join(lines) + '\n')
+PY
+git -C "$test_root/fixture" add scriptsv1.0/VERSION scriptsv1.0/SHA256SUMS.txt
+git -C "$test_root/fixture" -c user.name='TechE QA' \
+  -c user.email='qa@localhost' commit -qm third-valid-revision
+mkdir -p "$test_root/failbin"
+python3 - "$test_root/failbin/mv" "$current" <<'PY'
+from pathlib import Path
+import sys
+output, current = Path(sys.argv[1]), sys.argv[2]
+output.write_text('#!/usr/bin/env bash\nif [[ "$4" == "' + current +
+                  '" ]]; then exit 73; fi\nexec /usr/bin/mv "$@"\n')
+output.chmod(0o755)
+PY
+if PATH="$test_root/failbin:$PATH" "$command_path" update scriptsv1.0 \
+  > "$test_root/failed-activation.log" 2>&1; then
+  echo 'Injected current activation failure was incorrectly accepted' >&2
+  exit 65
+fi
+[[ $(readlink "$current") == "$second_target" &&
+   $(readlink "$test_root/teche.scripts/v1.0/rollback/$second_commit") == "$first_target" ]]
+git -C "$test_root/fixture" reset --hard -q "$second_commit"
+
+"$command_path" rollback scriptsv1.0 > "$test_root/rollback.log"
+[[ $(readlink "$current") == "$first_target" ]]
+"$command_path" ver > "$test_root/version-rollback.txt"
+grep -Fxq 'teche scripts version: 1.0.7' "$test_root/version-rollback.txt"
+grep -Fxq "TechE scripts source commit: $first_commit" "$test_root/version-rollback.txt"
+
+"$command_path" update scriptsv1.0 > "$test_root/update-after-rollback.log"
+[[ $(readlink "$current") == "$second_target" &&
+   $(readlink "$test_root/teche.scripts/v1.0/rollback/$second_commit") == "$first_target" ]]
 
 printf x >> "$test_root/fixture/scriptsv1.0/bin/teche"
 git -C "$test_root/fixture" add scriptsv1.0/bin/teche
@@ -109,8 +190,21 @@ if "$command_path" update scriptsv1.0 > "$test_root/tamper.log" 2>&1; then
   echo 'Tampered update was incorrectly accepted' >&2
   exit 65
 fi
-[[ $(readlink "$current") == "$first_target" ]]
+[[ $(readlink "$current") == "$second_target" ]]
 
-printf 'fixture_pull=pass aliases=pass help=pass version=pass helpers=pass tamper_rejected=pass\n'
+git -C "$test_root/fixture" reset --hard -q "$second_commit"
+mkdir -p "$test_root/fixture/scriptsv1.0/lib"
+printf '#!/usr/bin/env bash\nexit 0\n' > "$test_root/fixture/scriptsv1.0/lib/extra.sh"
+(cd "$test_root/fixture/scriptsv1.0" && sha256sum lib/extra.sh >> SHA256SUMS.txt)
+git -C "$test_root/fixture" add scriptsv1.0/lib/extra.sh scriptsv1.0/SHA256SUMS.txt
+git -C "$test_root/fixture" -c user.name='TechE QA' \
+  -c user.email='qa@localhost' commit -qm extra-manifested-file
+if "$command_path" update scriptsv1.0 > "$test_root/extra-file.log" 2>&1; then
+  echo 'Extra manifested file was incorrectly accepted' >&2
+  exit 65
+fi
+[[ $(readlink "$current") == "$second_target" ]]
+
+printf 'fixture_pull=pass aliases=pass help=pass version=pass scripts_only=pass exact_inventory=pass two_valid_commits=pass concurrent_update=pass retention=pass rollback=pass failed_activation_retains_prior=pass source_commit=pass tamper_rejected=pass\n'
 printf 'evidence_dir=%s\n' "$test_root"
-printf 'fixture_source_commit=%s\n' "$(cat "$test_root/teche.scripts/v1.0/source-commit")"
+printf 'fixture_source_commit=%s\n' "$second_commit"
