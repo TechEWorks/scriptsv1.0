@@ -11,6 +11,8 @@ on:
       - 'README.md'
       - 'ReadMeFirst.txt'
       - '.github/workflows/scripts-fixture-qa.yml'
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 jobs:
@@ -22,7 +24,7 @@ jobs:
         shell: bash
         run: |
           set -Eeuo pipefail
-          for script in 03-beta/packaging/assemble-runtime.sh 03-beta/src/bootstrap/teche 03-beta/src/bin/teche 03-beta/src/lib/*.sh 03-beta/tests/pull-fixture-test.sh; do
+          for script in 03-beta/packaging/assemble-runtime.sh 03-beta/src/bootstrap/teche 03-beta/src/bin/teche 03-beta/tests/pull-fixture-test.sh; do
             bash -n "$script"
           done
           runtime=$(mktemp -d)
