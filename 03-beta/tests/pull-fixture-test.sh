@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Exercises the public-folder pull path against a local Git fixture under /tmp.
-# No ServOS system files, disks or installed WorkDesk are changed.
+# No ServOS system files or disks are changed.
 set -Eeuo pipefail
 [[ $(id -u) == 0 && $# == 1 && -f $1/SHA256SUMS.txt ]] || {
   echo 'Usage: root pull-fixture-test.sh /path/to/extracted/runtime-package' >&2
@@ -14,8 +14,7 @@ mkdir -p "$test_root/fixture/scriptsv1.0" \
   "$test_root/teche.scripts"
 cp -a "$source_root/." "$test_root/fixture/scriptsv1.0/"
 chmod 0755 "$test_root/fixture/scriptsv1.0/bin/teche" \
-  "$test_root/fixture/scriptsv1.0/bootstrap/teche" \
-  "$test_root/fixture/scriptsv1.0/lib/"*.sh
+  "$test_root/fixture/scriptsv1.0/bootstrap/teche"
 (cd "$test_root/fixture/scriptsv1.0" && sha256sum -c SHA256SUMS.txt)
 # Rewrite only the fixture dispatcher path, then rehash its fixture manifest.
 python3 - "$test_root/fixture/scriptsv1.0" "$test_root" <<'PY'
@@ -80,26 +79,23 @@ first_target=$(readlink "$current")
 "$command_path" --help > "$test_root/help-after.txt"
 "$command_path" -help > "$test_root/help-alias-after.txt"
 "$command_path" --version > "$test_root/version-after.txt"
-"$command_path" build > "$test_root/build-routes.txt"
 grep -q 'scripts 1.0.7-qa' "$test_root/help-after.txt"
-grep -q 'txt-network' "$test_root/build-routes.txt"
-grep -q 'gui-offline' "$test_root/build-routes.txt"
 grep -q 'teche scripts version: 1.0.7-qa' "$test_root/version-after.txt"
+if grep -qi 'workdesk\|wd1.0' "$test_root/help-after.txt"; then
+  echo 'WorkDesk command leaked into ServOS scripts help' >&2
+  exit 65
+fi
+if "$command_path" get wd1.0 > "$test_root/unsupported-product.log" 2>&1; then
+  echo 'Unsupported product command was accepted' >&2
+  exit 65
+fi
 for args in 'update scriptsv1.0' 'get scripts' 'update scripts'; do
   read -r action target <<< "$args"
   "$command_path" "$action" "$target" >> "$test_root/aliases.log"
   [[ $(readlink "$current") == "$first_target" ]]
 done
 
-set +e
-"$current/lib/wd1.0-menu.sh" > "$test_root/menu-no-pack.log" 2>&1
-menu_status=$?
-"$current/lib/wd1.0-uninstall.sh" > "$test_root/uninstall-refusal.log" 2>&1
-uninstall_status=$?
-set -e
-[[ $menu_status == 2 && $uninstall_status == 78 ]]
-bash -n "$current/lib/wd1.0-menu.sh"
-bash -n "$current/lib/wd1.0-uninstall.sh"
+[[ ! -d $current/lib ]]
 
 printf x >> "$test_root/fixture/scriptsv1.0/bin/teche"
 git -C "$test_root/fixture" add scriptsv1.0/bin/teche
@@ -111,6 +107,6 @@ if "$command_path" update scriptsv1.0 > "$test_root/tamper.log" 2>&1; then
 fi
 [[ $(readlink "$current") == "$first_target" ]]
 
-printf 'fixture_pull=pass aliases=pass help=pass version=pass helpers=pass tamper_rejected=pass\n'
+printf 'fixture_pull=pass aliases=pass help=pass version=pass scripts_only=pass tamper_rejected=pass\n'
 printf 'evidence_dir=%s\n' "$test_root"
 printf 'fixture_source_commit=%s\n' "$(cat "$test_root/teche.scripts/v1.0/source-commit")"
