@@ -81,10 +81,14 @@ first_target=$(readlink "$current")
 "$command_path" -help > "$test_root/help-alias-after.txt"
 "$command_path" --version > "$test_root/version-after.txt"
 "$command_path" build > "$test_root/build-routes.txt"
-grep -q 'scripts 1.0.7-qa' "$test_root/help-after.txt"
+grep -q 'scripts 1.0.8-qa' "$test_root/help-after.txt"
 grep -q 'txt-network' "$test_root/build-routes.txt"
 grep -q 'gui-offline' "$test_root/build-routes.txt"
-grep -q 'teche scripts version: 1.0.7-qa' "$test_root/version-after.txt"
+grep -q 'teche scripts version: 1.0.8-qa' "$test_root/version-after.txt"
+# A non-root status call must not claim the private root cache is absent.
+runuser -u nobody -- "$current/bin/teche" status wd1.0 > "$test_root/nonroot-status.txt"
+grep -q 'package cache is private; run sudo teche status wd1.0' "$test_root/nonroot-status.txt"
+! grep -q 'run sudo teche get wd1.0' "$test_root/nonroot-status.txt"
 for args in 'update scriptsv1.0' 'get scripts' 'update scripts'; do
   read -r action target <<< "$args"
   "$command_path" "$action" "$target" >> "$test_root/aliases.log"
