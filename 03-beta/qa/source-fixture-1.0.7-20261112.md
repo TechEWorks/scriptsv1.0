@@ -1,17 +1,27 @@
 # ServOS scripts-only runtime 1.0.7 — source fixture
 
-**Result: source and corrected public-branch fixtures PASS; installed public-main D09 still FAIL / not retested.** The editable source is commit `c6f005338acb80d8c2d79cfe208e93d6d379133e` in [scripts source PR #2](https://github.com/TechEWorks/scriptsv1.0/pull/2). The proposed four-file runtime is [release PR #7](https://github.com/TechEWorks/release/pull/7). Its first 1.0.7 commit `7812b9e60a379115a53d175f74df8edbac1e70fc` had an invalid manifest because Windows working-copy line endings were hashed; a fresh Linux clone returned `VERSION: OK`, `bootstrap/teche: FAILED`, `bin/teche: FAILED`, exit 1. Commit `12c930c280bd334297f6da545192bcf2ebf30989` corrected the manifest from committed LF bytes and added path-specific LF checkout rules outside the four-file runtime folder. A second fresh Linux clone passed all three SHA-256 checks and the pull fixture. Both PRs remain draft and unmerged; this record grants no rights, independent review or production approval.
+**Current result: source and draft public-branch fixtures PASS; installed public-main D09 remains OPEN.** This record qualifies the exact scripts source revision `255e593d76d179faed7203425a458df3d46dea6b` and four-file runtime revision `f9fde69350964ef46dd9fab6f5b77978b3ec7212` for local fixture review only. They are [scripts source PR #2](https://github.com/TechEWorks/scriptsv1.0/pull/2) and [public release PR #7](https://github.com/TechEWorks/release/pull/7), both draft and unmerged. It grants no rights, independent review, ISO QA or production approval.
 
-On 2026-11-12, disposable Debian 13.7 QEMU VM275 cloned the exact source commit into `/tmp/teche-servos-scripts-1.0.7-c6f0053`. Bash syntax passed for both runtime scripts, the packager and fixture test. `assemble-runtime.sh` produced exactly `VERSION`, `bootstrap/teche`, `bin/teche` and generated `SHA256SUMS.txt`; `sha256sum -c` returned `OK` for all three manifest entries. `pull-fixture-test.sh` returned exit 0 with `fixture_pull=pass aliases=pass help=pass version=pass scripts_only=pass tamper_rejected=pass`; its isolated evidence directory is `/tmp/teche-pull-fixture.S9Dzdqls`. The fixture source commit is `f67556b15d399280e0f0d64936d9dcaa7f074da9` (local test fixture, not the product source or public release head).
+## Current exact checks — 2026-11-12
 
-VM275 also cloned corrected public PR head `12c930c280bd334297f6da545192bcf2ebf30989` into `/tmp/teche-public-runtime-12c930c`. Linux `sha256sum -c` returned `OK` for `VERSION`, `bootstrap/teche`, and `bin/teche`; the same source fixture against this **actual public-branch package** returned exit 0 with the six PASS markers above. Its isolated evidence directory is `/tmp/teche-pull-fixture.gMZotjwf`. This proves the draft branch package, not public `main` delivery or installed D09.
+Disposable Debian 13.7 QEMU VM275 assembled the S4 source under `/tmp/teche-servos-only-255e593`. Bash syntax passed for bootstrap, dispatcher, packager and fixture. `assemble-runtime.sh` produced exactly `VERSION`, `bootstrap/teche`, `bin/teche` and generated `SHA256SUMS.txt`; `sha256sum -c` returned OK for all three content files.
 
-| Relative runtime path | SHA-256 in generated manifest | Source/public Git blob |
-| --- | --- | --- |
-| `VERSION` | `6d6b9230dd8b8aac527f8929b7c2fc1fa0365deccca856216de979d6f5c6a6fe` | `238d6e882a08cec91c9bf37bd210147a0c968798` |
-| `bootstrap/teche` | `253e4dca50ec055c5290fc368afcf41f3999913c599b26f2c3e50f3d852bd78e` | `24f6205b71a1ae8a1bd66fe9d58f7b5de68e34e3` |
-| `bin/teche` | `9ce5248b513a69f5b9e1bfd50ba59d0140c60b77ced4f10884996c6088baf6d1` | `8011a489d7f9d4a5de70d886cbde2d40f58cae1b` |
+The local pull fixture returned exit 0 with `fixture_pull=pass aliases=pass help=pass version=pass scripts_only=pass two_valid_commits=pass retention=pass rollback=pass failed_activation_retains_prior=pass source_commit=pass tamper_rejected=pass`. It exercised two valid public commits, update and retention, explicit rollback, active-link source-commit reporting, and an injected current-link activation failure that left the prior rollback mapping intact. Fixture evidence is `/tmp/teche-pull-fixture.KVOXV5OD`. The fixture's own Git commits are synthetic and are not product source or release commits.
 
-The same three blob IDs were observed in source and public runtime worktrees. The corrected LF manifest's SHA-256 is `354a92df7c1cb4f9152a5217a6fa5eaebe8ff2a28ef790e324c82f8493c78f96`. The runtime contains no WorkDesk library or command. The exact ServOS ISO SHA-256 `9269b7641117b963986a4c6f5e157a41486fc84c5283fe8cf4fc96180617c097` embeds the same bootstrap bytes (`253e4dca50ec055c5290fc368afcf41f3999913c599b26f2c3e50f3d852bd78e`) as this proposed runtime; the version change is in the separately fetched package and does not change the ISO.
+A second check freshly sparse-cloned **both actual PR branches** on VM275 into `/tmp/teche-servos-pr-clone-255e593-f9fde69`. S4 assembly from the source clone was byte-identical to the four-file tree in the public runtime clone. Bash syntax, file count, scripts-only scan and all three SHA-256 manifest checks passed. The reviewed public runtime folder contains no WorkDesk helper, command or reference.
 
-**Remaining D09 path:** Rights/version review and approval of the four-file package; merge to public `release/main`; then rerun installed ServOS public fetch, manifest/no-extras, version/help/aliases, update, tamper rejection and prior-revision retention on the exact ISO. The earlier installed ISO returned exit 65 while `scriptsv1.0/` was absent from public main. A local fixture cannot pass that public delivery gate.
+| Runtime path | SHA-256 in manifest |
+| --- | --- |
+| `VERSION` | `6d6b9230dd8b8aac527f8929b7c2fc1fa0365deccca856216de979d6f5c6a6fe` |
+| `bootstrap/teche` | `efbde2cd0d7504f2a4ef61cb1cb50ef145da7a279ea1126b741709078ea0e7b6` |
+| `bin/teche` | `edc97b49aa7c6fb2fa7f1454f3405dfe61887490247fc5c64ffb7d3252bf91f6` |
+
+## ISO and installed D09 boundary
+
+The previous exact ServOS ISO SHA-256 `9269b7641117b963986a4c6f5e157a41486fc84c5283fe8cf4fc96180617c097` embeds **older** bootstrap SHA-256 `253e4dca50ec055c5290fc368afcf41f3999913c599b26f2c3e50f3d852bd78e`. It does not qualify the new rollback/metadata behavior. A new ISO must embed bootstrap SHA-256 `efbde2cd0d7504f2a4ef61cb1cb50ef145da7a279ea1126b741709078ea0e7b6`, receive its own ISO SHA-256 and full release-specific QA. No earlier ISO test result transfers.
+
+Public `TechEWorks/release/main` still lacks the approved `scriptsv1.0/` runtime. After rights, privacy, version and independent review gates, D09 must be rerun on the exact new installed ISO against public main: unauthenticated fetch, complete manifest/no extras, help/version/aliases, two revisions, retention, rollback, failed-activation/tamper rejection and active source-commit reporting.
+
+## Historical checks retained for traceability
+
+The earlier source revision `c6f005338acb80d8c2d79cfe208e93d6d379133e` and public-branch revision `12c930c280bd334297f6da545192bcf2ebf30989` passed the **earlier** six-marker fixture before rollback was added. The first 1.0.7 public-branch commit `7812b9e60a379115a53d175f74df8edbac1e70fc` failed Linux manifest verification because hashes were generated from Windows working-copy line endings; `12c930c` corrected committed LF hashes and added path-specific LF checkout rules. Those results remain historical and do not qualify `255e593`/`f9fde69` or a new ISO.
