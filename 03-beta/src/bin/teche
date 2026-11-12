@@ -15,6 +15,7 @@ TechE platform v1.0 | scripts $version
   teche update scriptsv1.0    Refresh the same scripts.
   teche get scripts           Alias for get scriptsv1.0.
   teche update scripts        Alias for update scriptsv1.0.
+  teche rollback scriptsv1.0  Activate the retained previous revision.
 EOF
 }
 
@@ -30,8 +31,11 @@ if (( $# == 1 )) && [[ $1 == ver || $1 == version || $1 == v || $1 == -v || $1 =
     *) printf 'Current OS: %s\n' "${PRETTY_NAME:-unknown}" ;;
   esac
   printf 'teche scripts version: %s\n' "$version"
-  if [[ -r $scripts_base/source-commit ]]; then
-    printf 'TechE scripts source commit: %s\n' "$(cat "$scripts_base/source-commit")"
+  active=$(readlink -f -- "$scripts_base/current" 2>/dev/null || true)
+  commit=${active##*/}
+  if [[ $active == "$scripts_base/releases/$commit" &&
+        $commit =~ ^[0-9a-f]{40}$ ]]; then
+    printf 'TechE scripts source commit: %s\n' "$commit"
   else
     echo 'TechE scripts source commit: not recorded on this machine'
   fi

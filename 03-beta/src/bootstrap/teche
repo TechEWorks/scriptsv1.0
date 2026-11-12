@@ -5,6 +5,7 @@ repo=https://github.com/TechEWorks/release.git
 base=/teche.scripts/v1.0
 current=$base/current
 stage=''
+pending_link=''
 refresh_started=0
 refresh_succeeded=0
 log_event() {
@@ -19,6 +20,7 @@ log_event() {
 cleanup() {
   if (( refresh_started && ! refresh_succeeded )); then log_event failed; fi
   [[ -z $stage ]] || rm -rf -- "$stage"
+  [[ -z $pending_link ]] || rm -f -- "$pending_link"
 }
 trap cleanup EXIT
 
@@ -30,6 +32,7 @@ TechE v1.0 bootstrap (scripts not yet installed)
   teche update scriptsv1.0    Refresh the same scripts.
   teche get scripts           Alias for get scriptsv1.0.
   teche update scripts        Alias for update scriptsv1.0.
+  teche rollback scriptsv1.0  Activate the retained previous revision.
   teche ver | --version       Show installed scripts version.
 Run teche help after activation for available script commands.
 EOF
@@ -63,8 +66,19 @@ verify_tree() {
     [[ ! -f $rel ]] || bash -n "$rel"
   done
 }
+resolve_release() {
+  local link=$1 target commit
+  [[ -L $link && -d $base/releases && ! -L $base/releases ]] || return 73
+  target=$(readlink -f -- "$link") || return 73
+  commit=${target##*/}
+  [[ $commit =~ ^[0-9a-f]{40}$ &&
+     $target == "$base/releases/$commit" &&
+     -d $target && ! -L $target ]] || return 73
+  verify_tree "$target" || return 65
+  printf '%s\n' "$target"
+}
 refresh() {
-  local src commit release candidate link old
+  local src commit release candidate link old old_release previous_link
   if (( $(id -u) != 0 )); then
     command -v sudo >/dev/null || { echo 'sudo is required.' >&2; return 77; }
     exec sudo -- "$0" "$@"
@@ -97,19 +111,66 @@ refresh() {
   fi
   [[ ! -e $current || -L $current ]] ||
     { echo 'Existing scripts path is not a link.' >&2; return 73; }
+  old_release=''
+  if [[ -L $current ]]; then
+    old_release=$(resolve_release "$current") ||
+      { echo 'Current scripts revision is invalid; inspect before updating.' >&2; return 73; }
+  fi
+  if [[ $old_release == "$release" ]]; then
+    printf 'TechE scripts %s already active from public release commit %s\n' \
+      "$(cat "$release/VERSION")" "$commit"
+    refresh_succeeded=1
+    log_event succeeded || true
+    return 0
+  fi
+  if [[ -n $old_release ]]; then
+    [[ ! -e $base/previous || -L $base/previous ]] ||
+      { echo 'Previous scripts path is not a link.' >&2; return 73; }
+    previous_link=$base/.previous.$$
+    pending_link=$previous_link
+    ln -s "$old_release" "$previous_link"
+    mv -Tf -- "$previous_link" "$base/previous"
+    pending_link=''
+  fi
   link=$base/.current.$$
+  pending_link=$link
   ln -s "$release" "$link"
   mv -Tf -- "$link" "$current"
-  printf '%s\n' "$commit" > "$base/source-commit"
+  pending_link=''
+  refresh_succeeded=1
   printf 'TechE scripts %s active from public release commit %s\n' \
     "$(cat "$current/VERSION")" "$commit"
-  refresh_succeeded=1
-  log_event succeeded
+  log_event succeeded || true
+}
+rollback() {
+  local active prior link
+  if (( $(id -u) != 0 )); then
+    command -v sudo >/dev/null || { echo 'sudo is required.' >&2; return 77; }
+    exec sudo -- "$0" "$@"
+  fi
+  active=$(resolve_release "$current") ||
+    { echo 'Current scripts revision is invalid.' >&2; return 73; }
+  prior=$(resolve_release "$base/previous") ||
+    { echo 'Retained previous scripts revision is unavailable or invalid.' >&2; return 73; }
+  [[ $prior != "$active" ]] ||
+    { echo 'Previous scripts revision is already active.' >&2; return 73; }
+  link=$base/.current.$$
+  pending_link=$link
+  ln -s "$prior" "$link"
+  mv -Tf -- "$link" "$current"
+  pending_link=''
+  printf 'TechE scripts %s restored from retained release commit %s\n' \
+    "$(cat "$prior/VERSION")" "${prior##*/}"
+  log_event rollback-succeeded || true
 }
 if (( $# == 2 )) &&
    [[ ( $1 == get || $1 == update ) &&
       ( $2 == scripts || $2 == scriptsv1.0 ) ]]; then
   refresh "$@"
+  exit 0
+fi
+if (( $# == 2 )) && [[ $1 == rollback && $2 == scriptsv1.0 ]]; then
+  rollback "$@"
   exit 0
 fi
 if [[ -x $current/bin/teche ]]; then
