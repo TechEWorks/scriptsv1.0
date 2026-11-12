@@ -9,12 +9,12 @@ pending_link=''
 refresh_started=0
 refresh_succeeded=0
 log_event() {
-  local result=$1 root=/techev1.0/servosv1.0/logs file
+  local result=$1 action=${2:-scriptsv1.0-refresh} root=/techev1.0/servosv1.0/logs file
   (( $(id -u) == 0 )) || return 0
   for file in "$root/operations/teche.log" "$root/audit/actions.log"; do
     [[ -d ${file%/*} ]] || continue
-    (umask 077; printf '%s action=scriptsv1.0-refresh result=%s\n' \
-      "$(date -u '+%Y.%m.%d %H.%M.%S UTC')" "$result" >> "$file")
+    (umask 077; printf '%s action=%s result=%s\n' \
+      "$(date -u '+%Y.%m.%d %H.%M.%S UTC')" "$action" "$result" >> "$file")
   done
 }
 cleanup() {
@@ -78,7 +78,7 @@ resolve_release() {
   printf '%s\n' "$target"
 }
 refresh() {
-  local src commit release candidate link old old_release previous_link
+  local src commit release candidate link old old_release rollback_link
   if (( $(id -u) != 0 )); then
     command -v sudo >/dev/null || { echo 'sudo is required.' >&2; return 77; }
     exec sudo -- "$0" "$@"
@@ -124,12 +124,15 @@ refresh() {
     return 0
   fi
   if [[ -n $old_release ]]; then
-    [[ ! -e $base/previous || -L $base/previous ]] ||
-      { echo 'Previous scripts path is not a link.' >&2; return 73; }
-    previous_link=$base/.previous.$$
-    pending_link=$previous_link
-    ln -s "$old_release" "$previous_link"
-    mv -Tf -- "$previous_link" "$base/previous"
+    [[ ! -L $base/rollback && ( ! -e $base/rollback || -d $base/rollback ) ]] ||
+      { echo 'Rollback path is not a directory.' >&2; return 73; }
+    install -d -m 0755 "$base/rollback"
+    [[ ! -e $base/rollback/$commit || -L $base/rollback/$commit ]] ||
+      { echo 'Rollback entry is not a link.' >&2; return 73; }
+    rollback_link=$base/rollback/.incoming.$$
+    pending_link=$rollback_link
+    ln -s "$old_release" "$rollback_link"
+    mv -Tf -- "$rollback_link" "$base/rollback/$commit"
     pending_link=''
   fi
   link=$base/.current.$$
@@ -143,14 +146,15 @@ refresh() {
   log_event succeeded || true
 }
 rollback() {
-  local active prior link
+  local active prior link commit
   if (( $(id -u) != 0 )); then
     command -v sudo >/dev/null || { echo 'sudo is required.' >&2; return 77; }
     exec sudo -- "$0" "$@"
   fi
   active=$(resolve_release "$current") ||
     { echo 'Current scripts revision is invalid.' >&2; return 73; }
-  prior=$(resolve_release "$base/previous") ||
+  commit=${active##*/}
+  prior=$(resolve_release "$base/rollback/$commit") ||
     { echo 'Retained previous scripts revision is unavailable or invalid.' >&2; return 73; }
   [[ $prior != "$active" ]] ||
     { echo 'Previous scripts revision is already active.' >&2; return 73; }
@@ -161,7 +165,7 @@ rollback() {
   pending_link=''
   printf 'TechE scripts %s restored from retained release commit %s\n' \
     "$(cat "$prior/VERSION")" "${prior##*/}"
-  log_event rollback-succeeded || true
+  log_event succeeded scriptsv1.0-rollback || true
 }
 if (( $# == 2 )) &&
    [[ ( $1 == get || $1 == update ) &&

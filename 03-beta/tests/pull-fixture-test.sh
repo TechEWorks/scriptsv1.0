@@ -123,10 +123,47 @@ second_target=$(readlink "$current")
 second_commit=${second_target##*/}
 [[ $second_target != "$first_target" &&
    -d $first_target && -d $second_target &&
-   $(readlink "$test_root/teche.scripts/v1.0/previous") == "$first_target" ]]
+   $(readlink "$test_root/teche.scripts/v1.0/rollback/$second_commit") == "$first_target" ]]
 "$command_path" ver > "$test_root/version-second.txt"
 grep -Fxq 'teche scripts version: 1.0.8' "$test_root/version-second.txt"
 grep -Fxq "TechE scripts source commit: $second_commit" "$test_root/version-second.txt"
+
+# Inject failure of current activation for a third valid commit. Its prepared
+# rollback entry must not replace the second commit's retained first revision.
+python3 - "$test_root/fixture/scriptsv1.0" <<'PY'
+from hashlib import sha256
+from pathlib import Path
+import sys
+package = Path(sys.argv[1])
+version = package / 'VERSION'
+version.write_text('1.0.9\n')
+manifest = package / 'SHA256SUMS.txt'
+lines = manifest.read_text().splitlines()
+matches = [i for i, line in enumerate(lines) if line.endswith('  VERSION')]
+assert len(matches) == 1
+lines[matches[0]] = f"{sha256(version.read_bytes()).hexdigest()}  VERSION"
+manifest.write_text('\n'.join(lines) + '\n')
+PY
+git -C "$test_root/fixture" add scriptsv1.0/VERSION scriptsv1.0/SHA256SUMS.txt
+git -C "$test_root/fixture" -c user.name='TechE QA' \
+  -c user.email='qa@localhost' commit -qm third-valid-revision
+mkdir -p "$test_root/failbin"
+python3 - "$test_root/failbin/mv" "$current" <<'PY'
+from pathlib import Path
+import sys
+output, current = Path(sys.argv[1]), sys.argv[2]
+output.write_text('#!/usr/bin/env bash\nif [[ "$4" == "' + current +
+                  '" ]]; then exit 73; fi\nexec /usr/bin/mv "$@"\n')
+output.chmod(0o755)
+PY
+if PATH="$test_root/failbin:$PATH" "$command_path" update scriptsv1.0 \
+  > "$test_root/failed-activation.log" 2>&1; then
+  echo 'Injected current activation failure was incorrectly accepted' >&2
+  exit 65
+fi
+[[ $(readlink "$current") == "$second_target" &&
+   $(readlink "$test_root/teche.scripts/v1.0/rollback/$second_commit") == "$first_target" ]]
+git -C "$test_root/fixture" reset --hard -q "$second_commit"
 
 "$command_path" rollback scriptsv1.0 > "$test_root/rollback.log"
 [[ $(readlink "$current") == "$first_target" ]]
@@ -136,7 +173,7 @@ grep -Fxq "TechE scripts source commit: $first_commit" "$test_root/version-rollb
 
 "$command_path" update scriptsv1.0 > "$test_root/update-after-rollback.log"
 [[ $(readlink "$current") == "$second_target" &&
-   $(readlink "$test_root/teche.scripts/v1.0/previous") == "$first_target" ]]
+   $(readlink "$test_root/teche.scripts/v1.0/rollback/$second_commit") == "$first_target" ]]
 
 printf x >> "$test_root/fixture/scriptsv1.0/bin/teche"
 git -C "$test_root/fixture" add scriptsv1.0/bin/teche
@@ -148,6 +185,6 @@ if "$command_path" update scriptsv1.0 > "$test_root/tamper.log" 2>&1; then
 fi
 [[ $(readlink "$current") == "$second_target" ]]
 
-printf 'fixture_pull=pass aliases=pass help=pass version=pass scripts_only=pass two_valid_commits=pass retention=pass rollback=pass source_commit=pass tamper_rejected=pass\n'
+printf 'fixture_pull=pass aliases=pass help=pass version=pass scripts_only=pass two_valid_commits=pass retention=pass rollback=pass failed_activation_retains_prior=pass source_commit=pass tamper_rejected=pass\n'
 printf 'evidence_dir=%s\n' "$test_root"
 printf 'fixture_source_commit=%s\n' "$second_commit"
