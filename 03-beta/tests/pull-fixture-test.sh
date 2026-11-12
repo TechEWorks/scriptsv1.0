@@ -79,8 +79,8 @@ first_target=$(readlink "$current")
 "$command_path" --help > "$test_root/help-after.txt"
 "$command_path" -help > "$test_root/help-alias-after.txt"
 "$command_path" --version > "$test_root/version-after.txt"
-grep -q 'scripts 1.0.7-qa' "$test_root/help-after.txt"
-grep -q 'teche scripts version: 1.0.7-qa' "$test_root/version-after.txt"
+grep -Fxq 'TechE platform v1.0 | scripts 1.0.7' "$test_root/help-after.txt"
+grep -Fxq 'teche scripts version: 1.0.7' "$test_root/version-after.txt"
 if grep -qi 'workdesk\|wd1.0' "$test_root/help-after.txt"; then
   echo 'WorkDesk command leaked into ServOS scripts help' >&2
   exit 65

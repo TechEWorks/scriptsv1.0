@@ -24,4 +24,4 @@ The bootstrap reads only the public release repository, so clients need no priva
 
 ## Current qualification
 
-The source fixture CI checks assembly, hashes, aliases, help, version, helper syntax, and tamper rejection. It does not prove an HTTPS pull from `release`, a newly built ServOS ISO, or installed-machine acceptance for 1.0.7-qa. After current Beta QA and approval, publish the generated runtime bytes to `release/scriptsv1.0/` and test on a disposable installed ServOS machine before release.
+The source fixture CI checks assembly, hashes, aliases, help, version, scripts-only scope, and tamper rejection. It does not prove an HTTPS pull from `release`, a newly built ServOS ISO, or installed-machine acceptance for proposed production runtime 1.0.7. After rights, review and release approval, publish the generated runtime bytes to `release/scriptsv1.0/` and test on a disposable installed ServOS machine before release.

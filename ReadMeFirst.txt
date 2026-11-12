@@ -6,4 +6,4 @@ This repository owns the editable Beta source. The active packet is [03-beta/Rea
 
 The Debian client keeps the native command at `/usr/bin/teche`. Approved downloaded scripts live under `/teche.scripts/v1.0/`, with `current/` and `releases/`. ServOS carries only the bootstrap from `03-beta/src/bootstrap/teche`. Installed clients fetch approved runtime files from the public `TechEWorks/release/scriptsv1.0/` path after release approval.
 
-The current public release path is absent. The Beta fixture test is source QA, not proof of a public HTTPS pull or a newly installed ServOS ISO. Historical 1.0.6-qa records remain in `03-beta/qa/`; they do not qualify 1.0.7-qa.
+The current public release path is absent. The fixture test is source QA, not proof of a public HTTPS pull or a newly installed ServOS ISO. Historical 1.0.6-qa records remain in `03-beta/qa/`; they do not qualify proposed production runtime 1.0.7.
