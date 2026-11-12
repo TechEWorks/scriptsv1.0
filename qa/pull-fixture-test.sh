@@ -9,6 +9,8 @@ set -Eeuo pipefail
 for tool in git python3 sha256sum; do command -v "$tool" >/dev/null || exit 69; done
 source_root=$(realpath "$1")
 test_root=$(mktemp -d /tmp/teche-pull-fixture.XXXXXXXX)
+# Allow the simulated unprivileged client to traverse this disposable fixture.
+chmod 0755 "$test_root"
 mkdir -p "$test_root/fixture/scriptsv1.0" \
   "$test_root/logs/operations" "$test_root/logs/audit" \
   "$test_root/teche.scripts"
