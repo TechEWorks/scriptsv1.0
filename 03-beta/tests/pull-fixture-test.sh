@@ -6,7 +6,7 @@ set -Eeuo pipefail
   echo 'Usage: root pull-fixture-test.sh /path/to/extracted/runtime-package' >&2
   exit 2
 }
-for tool in git python3 sha256sum; do command -v "$tool" >/dev/null || exit 69; done
+for tool in git python3 sha256sum flock; do command -v "$tool" >/dev/null || exit 69; done
 source_root=$(realpath "$1")
 test_root=$(mktemp -d /tmp/teche-pull-fixture.XXXXXXXX)
 mkdir -p "$test_root/fixture/scriptsv1.0" \
@@ -118,12 +118,19 @@ PY
 git -C "$test_root/fixture" add scriptsv1.0/VERSION scriptsv1.0/SHA256SUMS.txt
 git -C "$test_root/fixture" -c user.name='TechE QA' \
   -c user.email='qa@localhost' commit -qm second-valid-revision
-"$command_path" update scriptsv1.0 > "$test_root/update-second.log"
+"$command_path" update scriptsv1.0 > "$test_root/update-second-a.log" &
+first_update_pid=$!
+"$command_path" update scriptsv1.0 > "$test_root/update-second-b.log" &
+second_update_pid=$!
+wait "$first_update_pid"
+wait "$second_update_pid"
 second_target=$(readlink "$current")
 second_commit=${second_target##*/}
 [[ $second_target != "$first_target" &&
    -d $first_target && -d $second_target &&
    $(readlink "$test_root/teche.scripts/v1.0/rollback/$second_commit") == "$first_target" ]]
+[[ $(find "$test_root/teche.scripts/v1.0/releases" -mindepth 1 -maxdepth 1 -type d | wc -l) -eq 2 &&
+   -z $(find "$test_root/teche.scripts/v1.0/releases" -maxdepth 1 -name '.incoming.*' -print -quit) ]]
 "$command_path" ver > "$test_root/version-second.txt"
 grep -Fxq 'teche scripts version: 1.0.8' "$test_root/version-second.txt"
 grep -Fxq "TechE scripts source commit: $second_commit" "$test_root/version-second.txt"
@@ -185,6 +192,19 @@ if "$command_path" update scriptsv1.0 > "$test_root/tamper.log" 2>&1; then
 fi
 [[ $(readlink "$current") == "$second_target" ]]
 
-printf 'fixture_pull=pass aliases=pass help=pass version=pass scripts_only=pass two_valid_commits=pass retention=pass rollback=pass failed_activation_retains_prior=pass source_commit=pass tamper_rejected=pass\n'
+git -C "$test_root/fixture" reset --hard -q "$second_commit"
+mkdir -p "$test_root/fixture/scriptsv1.0/lib"
+printf '#!/usr/bin/env bash\nexit 0\n' > "$test_root/fixture/scriptsv1.0/lib/extra.sh"
+(cd "$test_root/fixture/scriptsv1.0" && sha256sum lib/extra.sh >> SHA256SUMS.txt)
+git -C "$test_root/fixture" add scriptsv1.0/lib/extra.sh scriptsv1.0/SHA256SUMS.txt
+git -C "$test_root/fixture" -c user.name='TechE QA' \
+  -c user.email='qa@localhost' commit -qm extra-manifested-file
+if "$command_path" update scriptsv1.0 > "$test_root/extra-file.log" 2>&1; then
+  echo 'Extra manifested file was incorrectly accepted' >&2
+  exit 65
+fi
+[[ $(readlink "$current") == "$second_target" ]]
+
+printf 'fixture_pull=pass aliases=pass help=pass version=pass scripts_only=pass exact_inventory=pass two_valid_commits=pass concurrent_update=pass retention=pass rollback=pass failed_activation_retains_prior=pass source_commit=pass tamper_rejected=pass\n'
 printf 'evidence_dir=%s\n' "$test_root"
 printf 'fixture_source_commit=%s\n' "$second_commit"

@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# TechE.Works | ServOS v1.0 scripts dispatcher | source version 1.0.7
+# Candidate prepared 2026-11-12 UTC; production release date pending.
 # ServOS scripts dispatcher loaded by the /usr/bin/teche bootstrap.
 set -Eeuo pipefail
 scripts_base=/teche.scripts/v1.0

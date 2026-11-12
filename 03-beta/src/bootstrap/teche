@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# TechE.Works | ServOS v1.0 scripts bootstrap | source version 1.0.7
+# Candidate prepared 2026-11-12 UTC; production release date pending.
 # ServOS keeps this universal bootstrap; scripts live in the public release catalog.
 set -Eeuo pipefail
 repo=https://github.com/TechEWorks/release.git
@@ -6,6 +8,7 @@ base=/teche.scripts/v1.0
 current=$base/current
 stage=''
 pending_link=''
+lock_fd=''
 refresh_started=0
 refresh_succeeded=0
 log_event() {
@@ -48,6 +51,10 @@ verify_tree() {
     [[ $line =~ ^([0-9a-f]{64})[[:space:]][[:space:]]([A-Za-z0-9._/-]+)$ ]] || return 65
     hash=${BASH_REMATCH[1]}
     rel=${BASH_REMATCH[2]}
+    case $rel in
+      VERSION|bootstrap/teche|bin/teche) ;;
+      *) return 65 ;;
+    esac
     [[ $rel != /* && $rel != *..* && $rel != *//* &&
        -z ${listed[$rel]+x} && -f $dir/$rel && ! -L $dir/$rel ]] || return 65
     listed[$rel]=1
@@ -59,12 +66,32 @@ verify_tree() {
     rel=${rel#"$dir/"}
     [[ $rel == SHA256SUMS.txt || -n ${listed[$rel]+x} ]] || return 65
   done < <(find "$dir" -type f)
-  [[ -z $(find "$dir" -type l -print -quit) && $count -gt 0 ]] || return 65
+  [[ -z $(find "$dir" -type l -print -quit) &&
+     $count -eq 3 &&
+     -n ${listed[VERSION]+x} &&
+     -n ${listed[bootstrap/teche]+x} &&
+     -n ${listed[bin/teche]+x} ]] || return 65
   bash -n "$dir/bin/teche"
   bash -n "$dir/bootstrap/teche"
-  for rel in "$dir"/lib/*.sh; do
-    [[ ! -f $rel ]] || bash -n "$rel"
+}
+acquire_lock() {
+  local tool
+  for tool in flock stat install; do
+    command -v "$tool" >/dev/null || { echo "Missing $tool" >&2; return 69; }
   done
+  [[ ! -L $base && ( ! -e $base || -d $base ) ]] ||
+    { echo 'Scripts base is not a directory.' >&2; return 73; }
+  install -d -m 0755 "$base"
+  [[ $(stat -c %u "$base") == 0 && ! -L $base ]] ||
+    { echo 'Scripts base is not root-owned.' >&2; return 73; }
+  [[ ! -L $base/.lock && ( ! -e $base/.lock || -f $base/.lock ) ]] ||
+    { echo 'Scripts lock path is unsafe.' >&2; return 73; }
+  (umask 077; : >> "$base/.lock")
+  [[ -f $base/.lock && ! -L $base/.lock &&
+     $(stat -c %u "$base/.lock") == 0 ]] ||
+    { echo 'Scripts lock is not a root-owned regular file.' >&2; return 73; }
+  exec {lock_fd}>> "$base/.lock"
+  flock -x "$lock_fd"
 }
 resolve_release() {
   local link=$1 target commit
@@ -83,6 +110,7 @@ refresh() {
     command -v sudo >/dev/null || { echo 'sudo is required.' >&2; return 77; }
     exec sudo -- "$0" "$@"
   fi
+  acquire_lock
   refresh_started=1
   log_event started
   if ! command -v git >/dev/null; then
@@ -151,6 +179,7 @@ rollback() {
     command -v sudo >/dev/null || { echo 'sudo is required.' >&2; return 77; }
     exec sudo -- "$0" "$@"
   fi
+  acquire_lock
   active=$(resolve_release "$current") ||
     { echo 'Current scripts revision is invalid.' >&2; return 73; }
   commit=${active##*/}
