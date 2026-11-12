@@ -98,7 +98,7 @@ refresh() {
   fi
   [[ ! -e $current || -L $current ]] ||
     { echo 'Existing scripts path is not a link.' >&2; return 73; }
-  link=$base/.current.$
+  link=$base/.current.$$
   ln -s "$release" "$link"
   mv -Tf -- "$link" "$current"
   printf '%s\n' "$commit" > "$base/source-commit"

@@ -9,6 +9,8 @@ set -Eeuo pipefail
 for tool in git python3 sha256sum; do command -v "$tool" >/dev/null || exit 69; done
 source_root=$(realpath "$1")
 test_root=$(mktemp -d /tmp/teche-pull-fixture.XXXXXXXX)
+# Allow the simulated unprivileged client to traverse this disposable fixture.
+chmod 0755 "$test_root"
 mkdir -p "$test_root/fixture/scriptsv1.0" \
   "$test_root/logs/operations" "$test_root/logs/audit" \
   "$test_root/teche.scripts"
@@ -81,10 +83,14 @@ first_target=$(readlink "$current")
 "$command_path" -help > "$test_root/help-alias-after.txt"
 "$command_path" --version > "$test_root/version-after.txt"
 "$command_path" build > "$test_root/build-routes.txt"
-grep -q 'scripts 1.0.7-qa' "$test_root/help-after.txt"
+grep -q 'scripts 1.0.8-qa' "$test_root/help-after.txt"
 grep -q 'txt-network' "$test_root/build-routes.txt"
 grep -q 'gui-offline' "$test_root/build-routes.txt"
-grep -q 'teche scripts version: 1.0.7-qa' "$test_root/version-after.txt"
+grep -q 'teche scripts version: 1.0.8-qa' "$test_root/version-after.txt"
+# A non-root status call must not claim the private root cache is absent.
+runuser -u nobody -- "$current/bin/teche" status wd1.0 > "$test_root/nonroot-status.txt"
+grep -q 'package cache is private; run sudo teche status wd1.0' "$test_root/nonroot-status.txt"
+! grep -q 'run sudo teche get wd1.0' "$test_root/nonroot-status.txt"
 for args in 'update scriptsv1.0' 'get scripts' 'update scripts'; do
   read -r action target <<< "$args"
   "$command_path" "$action" "$target" >> "$test_root/aliases.log"
