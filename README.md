@@ -19,7 +19,7 @@ The bootstrap reads only the public release repository. This means a user of Ser
 - `SHA256SUMS.txt`: hashes of every published file except the manifest itself.
 - `qa/`: component checks kept in the source repository.
 
-`teche help`, `teche --help`, `teche -help`, `teche -h`, and bare `teche` show the available commands. Before activation they show the bootstrap commands; after activation they show the full installed command set and script version. `teche ver` or `teche --version` shows platform, scripts, source commit, Debian base and WorkDesk install status. `teche build` lists registered build routes. The current QA build catalog lists WD(txt) network and WD(gui) offline only; WD(gui) network remains withheld. A build command is not a release approval.
+`teche help`, `teche --help`, `teche -help`, `teche -h`, and bare `teche` show the available commands. Before activation they show the bootstrap commands; after activation they show the full installed command set and script version. `teche ver` or `teche --version` shows platform, scripts, source commit, Debian base and WorkDesk install status. The WorkDesk ZIP cache is root-private: an unprivileged `teche status wd1.0` reports that limit and directs the administrator to `sudo teche status wd1.0` for verified cache state. `teche build` lists registered build routes. The current QA build catalog lists WD(txt) network and WD(gui) offline only; WD(gui) network remains withheld. A build command is not a release approval.
 
 ## Updating an installed system
 
